@@ -27,7 +27,7 @@ const IMAGE_MODELS = [
     badge: 'F2',
     color: 'oklch(0.72 0.14 180)',
     promptStyle: 'natural prose, 30-80 words, no negatives',
-    tips: 'Flux 2 Pro: write natural prose, front-load the subject, be specific about lighting and camera. Aim 30-80 words — the T5 encoder handles more but conciseness wins. No negative prompts (describe what you want, not what you don\'t). Quote exact strings for in-image text (92% accuracy). Hex codes like #FF6B00 are respected. Up to 2-3 reference images via image_urls / input_image_N.',
+    tips: 'Flux 2 Pro: write natural prose, front-load the subject, be specific about lighting and camera. Camera/lens lingo pulls hard — name the body (Hasselblad, Leica M11, Sony A7R V), focal length (35mm, 85mm), aperture (f/1.4 shallow DoF, f/8 deep), and film stock (Kodak Portra 400, Cinestill 800T). Aim 30-80 words — the T5 encoder handles more but conciseness wins. No negative prompts. Quote exact strings for in-image text (92% accuracy). Hex codes like #FF6B00 are respected. Up to 2-3 reference images via image_urls / input_image_N.',
     paramSuffix: () => '',
   },
   {
@@ -37,7 +37,7 @@ const IMAGE_MODELS = [
     badge: 'FX',
     color: 'oklch(0.78 0.14 200)',
     promptStyle: 'prose prompts, up to 10 refs, 4MP output',
-    tips: 'Flux 2 Max: same prose style as Pro but with higher fidelity, 4MP max resolution, and up to 10 reference images for character/brand consistency. Web-grounded generation handles current events and real-world knowledge. Use multiple refs for brand kits, fashion editorials, or multi-character scenes. No negatives. Keep prompts descriptive of what you want — let refs carry identity.',
+    tips: 'Flux 2 Max: same prose style as Pro but with higher fidelity, 4MP max resolution, and up to 10 reference images for character/brand consistency. Camera/lens lingo lands hard here too — specify body, focal length, aperture, film stock for photo looks. Web-grounded generation handles current events and real-world knowledge. Use multiple refs for brand kits, fashion editorials, or multi-character scenes. No negatives. Let refs carry identity; let the prose carry look and lighting.',
     paramSuffix: () => '',
   },
   {
@@ -120,7 +120,7 @@ const VIDEO_MODELS = [
     badge: 'KL',
     color: 'oklch(0.72 0.14 55)',
     promptStyle: 'Scene → Subject → Action → Camera → Style',
-    tips: 'Kling 3 rewards a strict order: Scene → Characters → Action → Camera → Audio/Style. Put camera instructions near the start ("slow dolly in", "static camera — subject speaks to lens"); simple motion verbs beat jargon. For multi-shot use timestamps: "[Shot 1] 00:00-00:04: wide establishing…". Image-to-video: describe the MOTION, not the image. First-last-frame: describe the TRANSITION, not either endpoint. Master tier = higher adherence, same grammar.',
+    tips: 'Kling 3 rewards a strict order: Scene → Characters → Action → Camera → Audio/Style. KEEP IT TIGHT — long prompts confuse the model; aim for 1-3 focused sentences per shot, not paragraphs. Put camera instructions near the start ("slow dolly in", "static camera — subject speaks to lens"); simple motion verbs beat jargon. For multi-shot use timestamps: "[Shot 1] 00:00-00:04: wide establishing…". Image-to-video: describe the MOTION, not the image. First-last-frame: describe the TRANSITION, not either endpoint. Master tier = higher adherence, same grammar.',
     paramSuffix: () => '',
   },
   {
