@@ -98,13 +98,13 @@ function compileParams(fields, mode, modelId) {
 
   const params = [];
 
-  // MJ-specific params
+  // MJ-specific params (v7 is default — emit --v only when overridden)
   if (modelId === 'midjourney') {
     if (fields.aspectRatio) params.push(`--ar ${fields.aspectRatio}`);
-    if (fields.stylize) params.push(`--stylize ${fields.stylize}`);
-    if (fields.chaos && fields.chaos > 0) params.push(`--chaos ${fields.chaos}`);
+    if (fields.stylize) params.push(`--s ${fields.stylize}`);
+    if (fields.chaos && fields.chaos > 0) params.push(`--c ${fields.chaos}`);
     if (fields.mjStyle) params.push(`--style ${fields.mjStyle}`);
-    params.push(`--v ${fields.mjVersion || '7'}`);
+    if (fields.mjVersion && fields.mjVersion !== '7') params.push(`--v ${fields.mjVersion}`);
     if (fields.seed) params.push(`--seed ${fields.seed}`);
   }
 
