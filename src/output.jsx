@@ -80,7 +80,7 @@ function OutputPane({ compiled, fields, onSave }) {
   const wordCount = natural ? natural.split(/\s+/).filter(Boolean).length : 0;
 
   return (
-    <div className="pane" style={{ background: 'var(--bg-0)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div className="pane pane-out" style={{ background: 'var(--bg-0)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div className="out-tabs">
         {TABS.map(t => (
           <button key={t.id} className="out-tab" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>

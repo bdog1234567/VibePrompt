@@ -30,6 +30,7 @@ function App() {
   const [view, setView] = useState('editor'); // 'editor' | 'library'
   const [tweaks, setTweaks] = useLocalStorage('vp_tweaks', window.TWEAKS || { accent: 'ember', showChat: true, serifTitle: true, mode: 'video' });
   const [showTweaks, setShowTweaks] = useState(false);
+  const [mobilePane, setMobilePane] = useState('editor');
 
   // apply tweaks to DOM
   useEffect(() => {
@@ -149,7 +150,7 @@ function App() {
           <button className="iconbtn ghost" onClick={() => setShowTweaks(s => !s)} title="Tweaks">
             <Icons.Sliders /> Tweaks
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 10px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 999 }}>
+          <div className="ai-ready" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 10px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 999 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)', display: 'inline-block' }} />
             <span style={{ fontSize: '11px', color: 'var(--fg-2)' }}>AI Ready</span>
           </div>
@@ -161,8 +162,21 @@ function App() {
         <ModelSelector mode={mode} selectedModel={modelId} onSelect={setModelId} />
       </div>
 
+      {/* MOBILE PANE SWITCHER */}
+      <div className="mobile-panes">
+        <button aria-pressed={mobilePane === 'chat'} onClick={() => setMobilePane('chat')}>
+          <Icons.Chat /> Chat
+        </button>
+        <button aria-pressed={mobilePane === 'editor'} onClick={() => setMobilePane('editor')}>
+          <Icons.Wand /> Editor
+        </button>
+        <button aria-pressed={mobilePane === 'output'} onClick={() => setMobilePane('output')}>
+          <Icons.Copy /> Output
+        </button>
+      </div>
+
       {/* MAIN */}
-      <div className={`main ${showChat ? '' : 'hide-chat'}`} style={{ flex: 1, minHeight: 0 }}>
+      <div className={`main ${showChat ? '' : 'hide-chat'}`} data-mpane={mobilePane} style={{ flex: 1, minHeight: 0 }}>
 
         {/* CHAT */}
         <div className="pane pane-chat" style={{ background: 'var(--bg-1)' }}>
@@ -187,7 +201,7 @@ function App() {
         </div>
 
         {/* EDITOR / LIBRARY */}
-        <div className="pane" style={{ background: 'var(--bg-0)' }}>
+        <div className="pane pane-editor" style={{ background: 'var(--bg-0)' }}>
           <div className="pane-head">
             {view === 'editor' ? (
               <>

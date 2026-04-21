@@ -50,6 +50,7 @@ input, textarea, select { font: inherit; color: inherit; }
 
 /* ---------- app shell ---------- */
 .app { height: 100vh; display: flex; flex-direction: column; }
+.topbar {
   display: flex; align-items: center; gap: 12px;
   padding: 0 14px;
   height: 48px;
@@ -402,5 +403,108 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 }
 .color-swatch[aria-pressed="true"] { border-color: var(--fg-0); transform: scale(1.15); }
 
-.subbar { display: flex; align-items: center; gap: 12; padding: 0 14px; height: 38px; flex-shrink: 0; border-bottom: 1px solid var(--line); background: var(--bg-1); overflow-x: auto; }
+.subbar { display: flex; align-items: center; gap: 12px; padding: 0 14px; height: 38px; flex-shrink: 0; border-bottom: 1px solid var(--line); background: var(--bg-1); overflow-x: auto; }
 .subbar::-webkit-scrollbar { display: none; }
+
+/* ========== MOBILE PANE SWITCHER ========== */
+.mobile-panes { display: none; }
+.mobile-panes button {
+  flex: 1; appearance: none;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 7px; padding: 7px 4px;
+  color: var(--fg-2); font-size: 12px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+}
+.mobile-panes button svg { width: 13px; height: 13px; }
+.mobile-panes button[aria-pressed="true"] {
+  background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent);
+}
+
+/* ========== RESPONSIVE: tablet ≤ 960px ========== */
+@media (max-width: 960px) {
+  .main { grid-template-columns: 260px 1fr 340px; }
+  .main.hide-chat { grid-template-columns: 0 1fr 340px; }
+  .section-body { grid-template-columns: 1fr; }
+}
+
+/* ========== RESPONSIVE: mobile ≤ 760px ========== */
+@media (max-width: 760px) {
+  body { font-size: 14px; }
+  .app { height: 100dvh; height: 100vh; }
+
+  /* Compact topbar — wrap rows, hide label-only content */
+  .topbar {
+    flex-wrap: wrap; height: auto; min-height: 48px;
+    padding: 7px 10px; gap: 8px;
+    row-gap: 8px;
+  }
+  .brand {
+    font-size: 18px; padding-right: 8px;
+  }
+  .brand .mark { width: 18px; height: 18px; }
+
+  /* Collapse the inline "topbar" used as inner nav into a full-width row */
+  .topbar .topbar {
+    order: 10; flex-basis: 100%; justify-content: flex-start;
+  }
+
+  /* Status pill (AI Ready) is noisy on small screens */
+  .topbar .ai-ready { display: none; }
+
+  .mode-switch button { padding: 4px 9px; font-size: 11.5px; }
+  .iconbtn { padding: 5px 9px; font-size: 11.5px; }
+
+  .subbar { padding: 0 10px; }
+
+  /* Mobile pane switcher visible */
+  .mobile-panes {
+    display: flex; gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-1);
+    flex-shrink: 0;
+  }
+
+  /* Single-column main; only active pane renders */
+  .main,
+  .main.hide-chat { grid-template-columns: 1fr; }
+  .pane + .pane { border-left: none; border-top: 1px solid var(--line); }
+  .main .pane { display: none; }
+  .main[data-mpane="chat"] .pane-chat { display: flex; }
+  .main[data-mpane="editor"] .pane-editor { display: flex; }
+  .main[data-mpane="output"] .pane-out { display: flex; }
+
+  /* Editor padding tightened */
+  .editor { padding: 14px 14px 40px; }
+  .editor-hero h1 { font-size: 26px; }
+
+  /* Output padding + wrap tab row */
+  .out-body { padding: 12px; }
+  .out-text { padding: 12px; padding-right: 70px; font-size: 13px; }
+
+  /* Save bar stacks */
+  .save-bar { flex-wrap: wrap; }
+  .save-bar input { flex: 1 1 100%; }
+
+  /* Tweaks becomes a bottom sheet */
+  .tweaks-panel {
+    left: 10px; right: 10px; bottom: 10px;
+    width: auto; max-height: 70vh; overflow-y: auto;
+  }
+
+  /* Statusbar compact */
+  .statusbar { font-size: 10px; gap: 6px; padding: 0 10px; }
+  .statusbar span:nth-of-type(n+5) { display: none; }
+  .statusbar span:last-child { display: inline; }
+
+  /* Chat tweaks */
+  .chat-messages { padding: 12px; }
+  .chat-compose textarea { min-height: 48px; }
+}
+
+/* ========== RESPONSIVE: narrow phones ≤ 380px ========== */
+@media (max-width: 380px) {
+  .brand { border-right: none; padding-right: 4px; }
+  .topbar .topbar .iconbtn span { display: none; }
+  .mobile-panes button { font-size: 11px; }
+}
