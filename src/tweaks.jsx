@@ -32,9 +32,11 @@ const PROVIDERS = [
     signup: 'https://platform.openai.com/api-keys',
     signupLabel: 'platform.openai.com',
     models: [
-      { id: 'gpt-4o-mini', label: 'GPT-4o mini (fast)' },
-      { id: 'gpt-4o', label: 'GPT-4o (balanced)' },
-      { id: 'gpt-4.1', label: 'GPT-4.1 (strongest)' },
+      { id: 'gpt-5-nano', label: 'GPT-5 nano (fastest)' },
+      { id: 'gpt-5-mini', label: 'GPT-5 mini (balanced)' },
+      { id: 'gpt-5', label: 'GPT-5 (strongest)' },
+      { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
+      { id: 'gpt-4o', label: 'GPT-4o' },
     ],
   },
   {
@@ -46,9 +48,10 @@ const PROVIDERS = [
     signup: 'https://aistudio.google.com/apikey',
     signupLabel: 'aistudio.google.com',
     models: [
-      { id: 'gemini-2.0-flash', label: 'Flash 2.0 (fast)' },
-      { id: 'gemini-1.5-flash', label: 'Flash 1.5' },
-      { id: 'gemini-1.5-pro', label: 'Pro 1.5 (strongest)' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (fast)' },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (strongest)' },
+      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+      { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
     ],
   },
 ];
