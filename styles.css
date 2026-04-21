@@ -537,8 +537,29 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
   .statusbar > * { flex-shrink: 0; }
 
   /* ---- Chat ---- */
-  .chat-messages { padding: 12px; }
-  .chat-compose textarea { min-height: 48px; }
+  .chat-messages { padding: 12px; min-height: 120px; }
+
+  /* Keep the foot from eating the whole viewport — cap it and let it
+     scroll internally so the Send button is always reachable. */
+  .chat-foot {
+    max-height: 60vh;
+    overflow-y: auto;
+    flex-shrink: 1;
+  }
+
+  /* Quick starts on mobile: one horizontal scroll row, no header label. */
+  .chat-starters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 10px 4px;
+    gap: 6px;
+  }
+  .chat-starters .lbl { display: none; }
+  .chat-starters .starter-btn { flex-shrink: 0; white-space: nowrap; }
+
+  .chat-compose { padding: 8px 10px 10px; gap: 6px; }
+  .chat-compose textarea { min-height: 44px; }
 }
 
 /* ========== RESPONSIVE: narrow phones ≤ 400px ========== */
