@@ -209,7 +209,7 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
     } catch (e) {
       setMessages(prev => [...prev, {
         id: Date.now() + 1, role: 'bot',
-        text: 'Something went wrong — please try again.',
+        text: e && e.message ? `⚠️ ${e.message}` : 'Something went wrong — please try again.',
         suggestions: [], applied: [], generatedPrompt: null,
       }]);
     } finally {
