@@ -21,14 +21,14 @@
       label: 'OpenAI',
       storageKey: 'vp_openai_key',
       storageModel: 'vp_openai_model',
-      defaultModel: 'gpt-5-mini',
+      defaultModel: 'gpt-5.4',
       call: callOpenAI,
     },
     gemini: {
       label: 'Google Gemini',
       storageKey: 'vp_gemini_key',
       storageModel: 'vp_gemini_model',
-      defaultModel: 'gemini-2.5-flash',
+      defaultModel: 'gemini-3.1-pro',
       call: callGemini,
     },
   };
