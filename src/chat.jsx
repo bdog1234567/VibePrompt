@@ -1,6 +1,33 @@
 // chat.jsx — AI creative director chat panel
 const { useState, useRef, useEffect } = React;
 
+// Downscale + re-encode a user-picked image so we don't blow token budgets.
+// Returns { mediaType, data (base64, no prefix), dataUrl (for preview) }.
+async function processImageFile(file, maxEdge = 1024) {
+  const dataUrl = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onerror = () => rej(new Error('Could not read image.'));
+    r.onload = () => res(r.result);
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onerror = () => rej(new Error('Could not decode image.'));
+    i.onload = () => res(i);
+    i.src = dataUrl;
+  });
+  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+  const outUrl = canvas.toDataURL('image/jpeg', 0.88);
+  const match = outUrl.match(/^data:(image\/[^;]+);base64,(.*)$/);
+  if (!match) throw new Error('Could not encode image.');
+  return { mediaType: match[1], data: match[2], dataUrl: outUrl };
+}
+
 const STARTERS = [
   "I want a cinematic sci-fi scene",
   "Golden hour portrait, film look",
@@ -151,6 +178,59 @@ function PromptCard({ prompt, onSendToGenerator }) {
   );
 }
 
+function ImageSlot({ label, img, inputRef, onPick, onClear }) {
+  const onChange = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) onPick(f);
+    e.target.value = '';
+  };
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 3,
+      border: '1px dashed var(--line-2)', borderRadius: 7,
+      padding: 5, background: 'var(--bg-2)', minWidth: 84,
+    }}>
+      {img ? (
+        <div style={{ position: 'relative' }}>
+          <img src={img.dataUrl} alt={label} style={{
+            width: 74, height: 74, objectFit: 'cover', borderRadius: 4, display: 'block',
+          }} />
+          <button
+            onClick={onClear}
+            title="Remove"
+            style={{
+              position: 'absolute', top: -6, right: -6,
+              width: 18, height: 18, borderRadius: '50%',
+              border: '1px solid var(--line-2)', background: 'var(--bg-3)',
+              color: 'var(--fg-1)', fontSize: 11, lineHeight: '16px',
+              cursor: 'pointer', padding: 0,
+            }}
+          >×</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => inputRef.current && inputRef.current.click()}
+          style={{
+            width: 74, height: 74, borderRadius: 4,
+            border: '1px solid var(--line-2)', background: 'var(--bg-3)',
+            color: 'var(--fg-2)', cursor: 'pointer', fontSize: 18,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          title={`Attach ${label.toLowerCase()}`}
+        >+</button>
+      )}
+      <span style={{ fontSize: 9.5, color: 'var(--fg-3)', textAlign: 'center' }}>{label}</span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
 function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
   const [messages, setMessages] = useState([{
     id: 0, role: 'bot',
@@ -159,18 +239,70 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
   }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  // 'text' | 'single' | 'firstlast'. Image mode is always 'single' (optional ref).
+  const [refMode, setRefMode] = useState('text');
+  const [refs, setRefs] = useState({ single: null, first: null, last: null });
+  const [refErr, setRefErr] = useState('');
   const scrollRef = useRef(null);
+  const singlePickRef = useRef(null);
+  const firstPickRef = useRef(null);
+  const lastPickRef = useRef(null);
+
+  // Image mode always uses the single-reference slot.
+  const effectiveRefMode = mode === 'image' ? 'single' : refMode;
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading]);
 
+  // Clear mismatched refs when mode/refMode changes.
+  useEffect(() => {
+    setRefs(prev => {
+      if (effectiveRefMode === 'text') return { single: null, first: null, last: null };
+      if (effectiveRefMode === 'single') return { single: prev.single, first: null, last: null };
+      return { single: null, first: prev.first, last: prev.last };
+    });
+  }, [effectiveRefMode]);
+
+  const pickImage = async (slot, file) => {
+    if (!file) return;
+    setRefErr('');
+    try {
+      const img = await processImageFile(file);
+      setRefs(prev => ({ ...prev, [slot]: img }));
+    } catch (e) {
+      setRefErr(e?.message || 'Could not attach that image.');
+    }
+  };
+  const clearRef = (slot) => setRefs(prev => ({ ...prev, [slot]: null }));
+
+  const attachedImages = (() => {
+    if (effectiveRefMode === 'single' && refs.single) {
+      return [{ label: 'Reference image', slot: 'single', ...refs.single }];
+    }
+    if (effectiveRefMode === 'firstlast') {
+      const out = [];
+      if (refs.first) out.push({ label: 'First frame', slot: 'first', ...refs.first });
+      if (refs.last) out.push({ label: 'Last frame', slot: 'last', ...refs.last });
+      return out;
+    }
+    return [];
+  })();
+
   const sendMessage = async (text) => {
-    if (!text.trim() || loading) return;
-    const userMsg = { id: Date.now(), role: 'user', text: text.trim(), suggestions: [], applied: [], generatedPrompt: null };
+    if ((!text.trim() && !attachedImages.length) || loading) return;
+    const userMsg = {
+      id: Date.now(),
+      role: 'user',
+      text: text.trim(),
+      images: attachedImages.map(img => ({ label: img.label, mediaType: img.mediaType, data: img.data, dataUrl: img.dataUrl })),
+      suggestions: [], applied: [], generatedPrompt: null,
+    };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setInput('');
+    // Clear the staged refs now that they're attached to the message.
+    setRefs({ single: null, first: null, last: null });
     setLoading(true);
 
     const allModels = mode === 'image' ? window.IMAGE_MODELS : window.VIDEO_MODELS;
@@ -185,14 +317,36 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
     const contextNote = fieldCtx ? `\nCurrent prompt fields already filled:\n${fieldCtx}` : '';
     const modeNote = `\nMode: ${mode === 'video' ? 'Video generation' : 'Image generation'}`;
 
-    const historyMsgs = updatedMessages.map(m => ({
-      role: m.role === 'bot' ? 'assistant' : 'user',
-      content: m.text,
-    }));
+    let refNote = '';
+    if (mode === 'image' && attachedImages.length) {
+      refNote = `\nThe user attached a reference image. Use its subject, style, color palette, composition, and mood to inform the generated prompt.`;
+    } else if (mode === 'video' && effectiveRefMode === 'single' && attachedImages.length) {
+      refNote = `\nThe user attached a single reference image — this is an image-to-video shot starting from (or inspired by) that image. Describe motion, camera work, and how the scene evolves over time.`;
+    } else if (mode === 'video' && effectiveRefMode === 'firstlast' && attachedImages.length >= 1) {
+      refNote = `\nThe user attached first-frame and/or last-frame references for a first-last-frame video. Describe a smooth motion/transition that starts at the first frame and ends at the last frame — camera moves, subject action, lighting changes.`;
+    }
+
+    // Build provider-ready history. Messages may carry images on user turns.
+    const historyMsgs = updatedMessages.map(m => {
+      const role = m.role === 'bot' ? 'assistant' : 'user';
+      if (m.role === 'user' && m.images && m.images.length) {
+        const blocks = [];
+        m.images.forEach(img => {
+          blocks.push({ type: 'text', text: `[${img.label}]` });
+          blocks.push({ type: 'image', mediaType: img.mediaType, data: img.data });
+        });
+        if (m.text) blocks.push({ type: 'text', text: m.text });
+        else if (!blocks.some(b => b.type === 'text' && b.text.trim())) {
+          blocks.push({ type: 'text', text: '(image only — interpret and generate a prompt)' });
+        }
+        return { role, content: blocks };
+      }
+      return { role, content: m.text };
+    });
 
     try {
       const reply = await window.claude.complete({
-        system: SYSTEM_PROMPT + modeNote + modelNote + contextNote,
+        system: SYSTEM_PROMPT + modeNote + modelNote + contextNote + refNote,
         messages: historyMsgs,
       });
 
@@ -250,6 +404,22 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
             <div className="av">{msg.role === 'bot' ? 'VP' : 'U'}</div>
             <div className="msg-body">
               <div className="msg-name">{msg.role === 'bot' ? 'VibePrompt AI' : 'You'}</div>
+              {msg.images && msg.images.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                  {msg.images.map((img, i) => (
+                    <div key={i} style={{
+                      display: 'flex', flexDirection: 'column', gap: 2,
+                      border: '1px solid var(--line-2)', borderRadius: 6,
+                      padding: 3, background: 'var(--bg-3)',
+                    }}>
+                      <img src={img.dataUrl} alt={img.label} style={{
+                        width: 84, height: 84, objectFit: 'cover', borderRadius: 4, display: 'block',
+                      }} />
+                      <span style={{ fontSize: 9.5, color: 'var(--fg-3)', textAlign: 'center' }}>{img.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="msg-text">
                 {msg.text.split('\n').map((line, i) => line.trim() ? <p key={i}>{line}</p> : null)}
               </div>
@@ -300,6 +470,61 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
           </div>
         )}
         <div className="chat-compose">
+          {mode === 'video' && (
+            <div className="tw-opts" style={{ flexWrap: 'wrap', marginBottom: 6 }}>
+              {[
+                ['text', 'Text'],
+                ['single', 'Image → video'],
+                ['firstlast', 'First + Last'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  className="tw-opt"
+                  aria-pressed={refMode === id}
+                  onClick={() => setRefMode(id)}
+                  style={{ fontSize: 10.5 }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {effectiveRefMode !== 'text' && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+              {effectiveRefMode === 'single' && (
+                <ImageSlot
+                  label={mode === 'image' ? 'Reference image' : 'Reference'}
+                  img={refs.single}
+                  inputRef={singlePickRef}
+                  onPick={file => pickImage('single', file)}
+                  onClear={() => clearRef('single')}
+                />
+              )}
+              {effectiveRefMode === 'firstlast' && (
+                <>
+                  <ImageSlot
+                    label="First frame"
+                    img={refs.first}
+                    inputRef={firstPickRef}
+                    onPick={file => pickImage('first', file)}
+                    onClear={() => clearRef('first')}
+                  />
+                  <ImageSlot
+                    label="Last frame"
+                    img={refs.last}
+                    inputRef={lastPickRef}
+                    onPick={file => pickImage('last', file)}
+                    onClear={() => clearRef('last')}
+                  />
+                </>
+              )}
+            </div>
+          )}
+          {refErr && (
+            <div style={{ fontSize: 10.5, color: 'oklch(0.72 0.14 25)', marginBottom: 6 }}>{refErr}</div>
+          )}
+
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -311,7 +536,11 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
           />
           <div className="compose-row">
             <span className="hint">Enter to send · Shift+Enter for newline</span>
-            <button className="iconbtn primary" onClick={() => sendMessage(input)} disabled={!input.trim() || loading}>
+            <button
+              className="iconbtn primary"
+              onClick={() => sendMessage(input)}
+              disabled={(!input.trim() && attachedImages.length === 0) || loading}
+            >
               <Icons.Send /> {loading ? 'Generating…' : 'Send'}
             </button>
           </div>

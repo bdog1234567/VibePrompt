@@ -41,7 +41,37 @@
     },
   };
 
+  // Translate our generic message content (string OR array of
+  // {type:'text',text} / {type:'image',mediaType,data} blocks) into each
+  // provider's vision format.
+  function toAnthropicContent(content) {
+    if (typeof content === 'string') return content;
+    return content.map(b => {
+      if (b.type === 'image') {
+        return { type: 'image', source: { type: 'base64', media_type: b.mediaType, data: b.data } };
+      }
+      return { type: 'text', text: b.text };
+    });
+  }
+  function toOpenAIContent(content) {
+    if (typeof content === 'string') return content;
+    return content.map(b => {
+      if (b.type === 'image') {
+        return { type: 'image_url', image_url: { url: `data:${b.mediaType};base64,${b.data}` } };
+      }
+      return { type: 'text', text: b.text };
+    });
+  }
+  function toGeminiParts(content) {
+    if (typeof content === 'string') return [{ text: content }];
+    return content.map(b => b.type === 'image'
+      ? { inlineData: { mimeType: b.mediaType, data: b.data } }
+      : { text: b.text }
+    );
+  }
+
   async function callAnthropic({ system, messages, model, apiKey }) {
+    const anthMsgs = messages.map(m => ({ role: m.role, content: toAnthropicContent(m.content) }));
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -50,7 +80,7 @@
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify({ model, max_tokens: 1024, system, messages }),
+      body: JSON.stringify({ model, max_tokens: 1024, system, messages: anthMsgs }),
     });
     if (!resp.ok) throw await apiError(resp, 'Anthropic');
     const data = await resp.json();
@@ -60,7 +90,7 @@
   async function callOpenAI({ system, messages, model, apiKey }) {
     const openaiMessages = [
       { role: 'system', content: system },
-      ...messages,
+      ...messages.map(m => ({ role: m.role, content: toOpenAIContent(m.content) })),
     ];
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -78,7 +108,7 @@
   async function callGemini({ system, messages, model, apiKey }) {
     const contents = messages.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
+      parts: toGeminiParts(m.content),
     }));
     const body = {
       contents,
