@@ -59,20 +59,35 @@ const PROVIDERS = [
   },
 ];
 
+function loadCachedModels(providerId) {
+  try {
+    const raw = localStorage.getItem('vp_models_' + providerId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length ? parsed : null;
+  } catch { return null; }
+}
+
 function ChatProviderField() {
   const [provider, setProvider] = useState(() => localStorage.getItem('vp_provider') || 'anthropic');
   const cfg = PROVIDERS.find(p => p.id === provider) || PROVIDERS[0];
 
   const [key, setKey] = useState(() => localStorage.getItem(cfg.keyStorage) || '');
-  const [model, setModel] = useState(() => localStorage.getItem(cfg.modelStorage) || cfg.models[0].id);
+  const [models, setModels] = useState(() => loadCachedModels(cfg.id) || cfg.models);
+  const [model, setModel] = useState(() => localStorage.getItem(cfg.modelStorage) || (loadCachedModels(cfg.id) || cfg.models)[0].id);
   const [show, setShow] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState('');
 
-  // reload key/model when provider changes
+  // reload key/model/models when provider changes
   useEffect(() => {
+    const nextModels = loadCachedModels(cfg.id) || cfg.models;
     setKey(localStorage.getItem(cfg.keyStorage) || '');
-    setModel(localStorage.getItem(cfg.modelStorage) || cfg.models[0].id);
+    setModels(nextModels);
+    setModel(localStorage.getItem(cfg.modelStorage) || nextModels[0].id);
     setSaved(false);
+    setRefreshMsg('');
   }, [provider]);
 
   const pickProvider = (id) => {
@@ -91,6 +106,38 @@ function ChatProviderField() {
   const clearKey = () => {
     setKey('');
     localStorage.removeItem(cfg.keyStorage);
+  };
+  const refreshModels = async () => {
+    if (!key.trim() || refreshing) return;
+    setRefreshing(true);
+    setRefreshMsg('');
+    try {
+      const fetched = await window.claude.listModels(cfg.id, key.trim());
+      if (!fetched || !fetched.length) throw new Error('No models returned.');
+      localStorage.setItem('vp_models_' + cfg.id, JSON.stringify(fetched));
+      setModels(fetched);
+      // keep current model if still valid, else pick first
+      if (!fetched.some(m => m.id === model)) {
+        setModel(fetched[0].id);
+        localStorage.setItem(cfg.modelStorage, fetched[0].id);
+      }
+      setRefreshMsg(`Found ${fetched.length} model${fetched.length === 1 ? '' : 's'}`);
+      setTimeout(() => setRefreshMsg(''), 2500);
+    } catch (e) {
+      setRefreshMsg(e?.message || 'Failed to list models.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  const resetModels = () => {
+    localStorage.removeItem('vp_models_' + cfg.id);
+    setModels(cfg.models);
+    if (!cfg.models.some(m => m.id === model)) {
+      setModel(cfg.models[0].id);
+      localStorage.setItem(cfg.modelStorage, cfg.models[0].id);
+    }
+    setRefreshMsg('Reset to built-in list');
+    setTimeout(() => setRefreshMsg(''), 2000);
   };
 
   return (
@@ -136,14 +183,38 @@ function ChatProviderField() {
         <button className="tw-opt" onClick={clearKey} disabled={!key}>Clear</button>
       </div>
 
-      <div className="tw-lbl" style={{ marginTop: 2 }}>Model</div>
-      <div className="tw-opts" style={{ flexWrap: 'wrap' }}>
-        {cfg.models.map(m => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+        <div className="tw-lbl" style={{ flex: 1 }}>Model</div>
+        <button
+          className="tw-opt"
+          onClick={refreshModels}
+          disabled={!key.trim() || refreshing}
+          title="Fetch available models from the provider"
+          style={{ fontSize: 10.5 }}
+        >
+          {refreshing ? '…' : '↻'} Refresh
+        </button>
+        {loadCachedModels(cfg.id) && (
+          <button
+            className="tw-opt"
+            onClick={resetModels}
+            title="Use built-in defaults"
+            style={{ fontSize: 10.5 }}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      <div className="tw-opts" style={{ flexWrap: 'wrap', maxHeight: 180, overflowY: 'auto' }}>
+        {models.map(m => (
           <button key={m.id} className="tw-opt" aria-pressed={model === m.id} onClick={() => pickModel(m.id)}>
             {m.label}
           </button>
         ))}
       </div>
+      {refreshMsg && (
+        <div style={{ fontSize: 10.5, color: 'var(--fg-4)' }}>{refreshMsg}</div>
+      )}
 
       <div style={{ fontSize: 10.5, color: 'var(--fg-4)', lineHeight: 1.5 }}>
         Keys stored in this browser only. Get a {cfg.label} key at{' '}

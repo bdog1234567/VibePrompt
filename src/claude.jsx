@@ -130,4 +130,54 @@
       throw e;
     }
   };
+
+  // List available models for a provider. Returns an array of
+  // { id, label } or throws a human-readable Error.
+  window.claude.listModels = async function (providerId, apiKey) {
+    providerId = (providerId || '').toLowerCase();
+    apiKey = (apiKey || '').trim();
+    if (!apiKey) throw new Error('Save an API key first.');
+
+    if (providerId === 'anthropic') {
+      const resp = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+      });
+      if (!resp.ok) throw await apiError(resp, 'Anthropic');
+      const data = await resp.json();
+      return (data.data || []).map(m => ({ id: m.id, label: m.display_name || m.id }));
+    }
+
+    if (providerId === 'openai') {
+      const resp = await fetch('https://api.openai.com/v1/models', {
+        headers: { 'authorization': `Bearer ${apiKey}` },
+      });
+      if (!resp.ok) throw await apiError(resp, 'OpenAI');
+      const data = await resp.json();
+      const chatty = (data.data || [])
+        .map(m => m.id)
+        .filter(id => /^(gpt-|o\d|chatgpt-)/i.test(id))
+        .filter(id => !/embedding|whisper|tts|audio|image|dall-e|moderation|realtime|transcribe/i.test(id))
+        .sort();
+      return chatty.map(id => ({ id, label: id }));
+    }
+
+    if (providerId === 'gemini') {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+      if (!resp.ok) throw await apiError(resp, 'Gemini');
+      const data = await resp.json();
+      return (data.models || [])
+        .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map(m => {
+          const id = (m.name || '').replace(/^models\//, '');
+          return { id, label: m.displayName || id };
+        })
+        .filter(m => m.id);
+    }
+
+    throw new Error(`Unknown provider: ${providerId}`);
+  };
 })();
