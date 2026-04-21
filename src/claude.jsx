@@ -9,6 +9,14 @@
 
   const KEY_PROVIDER = 'vp_provider';
 
+  // One-shot migration: strip a known-bad saved Gemini model so users who
+  // picked it before we could verify it don't get stuck on a 404.
+  try {
+    if (localStorage.getItem('vp_gemini_model') === 'gemini-3.1-pro') {
+      localStorage.removeItem('vp_gemini_model');
+    }
+  } catch {}
+
   const CFG = {
     anthropic: {
       label: 'Anthropic (Claude)',
@@ -112,6 +120,22 @@
     return new Error(`${provider} API ${resp.status}: ${detail}`);
   }
 
+  // Pick a sensible default from a fetched list — prefer fast, widely-available models.
+  function pickDefaultFromList(providerId, list) {
+    if (!list || !list.length) return null;
+    const ids = list.map(m => m.id);
+    const prefer = ({
+      anthropic: [/haiku-4/i, /sonnet-4/i, /haiku/i, /sonnet/i],
+      openai: [/^gpt-5.*mini/i, /^gpt-4o-mini/i, /^gpt-4o/i, /^gpt-/i],
+      gemini: [/2\.5-flash$/i, /2\.5-flash/i, /flash/i, /pro/i],
+    })[providerId] || [];
+    for (const rx of prefer) {
+      const hit = ids.find(id => rx.test(id));
+      if (hit) return hit;
+    }
+    return ids[0];
+  }
+
   window.claude = window.claude || {};
   window.claude.complete = async function ({ system, messages }) {
     const provider = (localStorage.getItem(KEY_PROVIDER) || 'anthropic').toLowerCase();
@@ -126,6 +150,18 @@
     } catch (e) {
       if (e && e.name === 'TypeError') {
         throw new Error(`Network error reaching ${cfg.label}. Check your connection.`);
+      }
+      // Self-heal when the saved model is invalid: fetch the real list, swap, retry once.
+      if (e && /recognize the selected model/i.test(e.message || '')) {
+        try {
+          const list = await window.claude.listModels(provider, apiKey);
+          const picked = pickDefaultFromList(provider, list);
+          if (picked && picked !== model) {
+            localStorage.setItem(cfg.storageModel, picked);
+            localStorage.setItem('vp_models_' + provider, JSON.stringify(list));
+            return await cfg.call({ system, messages, model: picked, apiKey });
+          }
+        } catch (_) { /* fall through to original error */ }
       }
       throw e;
     }

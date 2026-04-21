@@ -51,10 +51,9 @@ const PROVIDERS = [
     signup: 'https://aistudio.google.com/apikey',
     signupLabel: 'aistudio.google.com',
     models: [
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (free)' },
       { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (free)' },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (free)' },
       { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (free, fastest)' },
-      { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro (paid)' },
     ],
   },
 ];
