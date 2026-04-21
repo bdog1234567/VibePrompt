@@ -8,33 +8,106 @@ const ACCENTS = [
   { id: 'citron', color: 'oklch(0.82 0.14 100)', label: 'Citron' },
 ];
 
-const CLAUDE_MODELS = [
-  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 (fast)' },
-  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (balanced)' },
-  { id: 'claude-opus-4-7', label: 'Opus 4.7 (strongest)' },
+const PROVIDERS = [
+  {
+    id: 'anthropic',
+    label: 'Claude',
+    keyStorage: 'vp_anthropic_key',
+    modelStorage: 'vp_anthropic_model',
+    placeholder: 'sk-ant-...',
+    signup: 'https://console.anthropic.com/settings/keys',
+    signupLabel: 'console.anthropic.com',
+    models: [
+      { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 (fast)' },
+      { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (balanced)' },
+      { id: 'claude-opus-4-7', label: 'Opus 4.7 (strongest)' },
+    ],
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    keyStorage: 'vp_openai_key',
+    modelStorage: 'vp_openai_model',
+    placeholder: 'sk-...',
+    signup: 'https://platform.openai.com/api-keys',
+    signupLabel: 'platform.openai.com',
+    models: [
+      { id: 'gpt-4o-mini', label: 'GPT-4o mini (fast)' },
+      { id: 'gpt-4o', label: 'GPT-4o (balanced)' },
+      { id: 'gpt-4.1', label: 'GPT-4.1 (strongest)' },
+    ],
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    keyStorage: 'vp_gemini_key',
+    modelStorage: 'vp_gemini_model',
+    placeholder: 'AIza...',
+    signup: 'https://aistudio.google.com/apikey',
+    signupLabel: 'aistudio.google.com',
+    models: [
+      { id: 'gemini-2.0-flash', label: 'Flash 2.0 (fast)' },
+      { id: 'gemini-1.5-flash', label: 'Flash 1.5' },
+      { id: 'gemini-1.5-pro', label: 'Pro 1.5 (strongest)' },
+    ],
+  },
 ];
 
-function ApiKeyField() {
-  const [key, setKey] = useState(() => localStorage.getItem('vp_anthropic_key') || '');
+function ChatProviderField() {
+  const [provider, setProvider] = useState(() => localStorage.getItem('vp_provider') || 'anthropic');
+  const cfg = PROVIDERS.find(p => p.id === provider) || PROVIDERS[0];
+
+  const [key, setKey] = useState(() => localStorage.getItem(cfg.keyStorage) || '');
+  const [model, setModel] = useState(() => localStorage.getItem(cfg.modelStorage) || cfg.models[0].id);
   const [show, setShow] = useState(false);
   const [saved, setSaved] = useState(false);
-  const save = () => {
-    localStorage.setItem('vp_anthropic_key', key.trim());
+
+  // reload key/model when provider changes
+  useEffect(() => {
+    setKey(localStorage.getItem(cfg.keyStorage) || '');
+    setModel(localStorage.getItem(cfg.modelStorage) || cfg.models[0].id);
+    setSaved(false);
+  }, [provider]);
+
+  const pickProvider = (id) => {
+    setProvider(id);
+    localStorage.setItem('vp_provider', id);
+  };
+  const pickModel = (id) => {
+    setModel(id);
+    localStorage.setItem(cfg.modelStorage, id);
+  };
+  const saveKey = () => {
+    localStorage.setItem(cfg.keyStorage, key.trim());
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
-  const clear = () => {
+  const clearKey = () => {
     setKey('');
-    localStorage.removeItem('vp_anthropic_key');
+    localStorage.removeItem(cfg.keyStorage);
   };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="tw-opts" style={{ flexWrap: 'wrap' }}>
+        {PROVIDERS.map(p => (
+          <button
+            key={p.id}
+            className="tw-opt"
+            aria-pressed={provider === p.id}
+            onClick={() => pickProvider(p.id)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', gap: 6 }}>
         <input
           type={show ? 'text' : 'password'}
           value={key}
           onChange={e => setKey(e.target.value)}
-          placeholder="sk-ant-..."
+          placeholder={cfg.placeholder}
           spellCheck={false}
           autoComplete="off"
           style={{
@@ -49,35 +122,29 @@ function ApiKeyField() {
           {show ? 'Hide' : 'Show'}
         </button>
       </div>
+
       <div style={{ display: 'flex', gap: 6 }}>
-        <button className="tw-opt" aria-pressed={saved} onClick={save} disabled={!key.trim()}>
+        <button className="tw-opt" aria-pressed={saved} onClick={saveKey} disabled={!key.trim()}>
           {saved ? '✓ Saved' : 'Save key'}
         </button>
-        <button className="tw-opt" onClick={clear} disabled={!key}>Clear</button>
+        <button className="tw-opt" onClick={clearKey} disabled={!key}>Clear</button>
       </div>
+
+      <div className="tw-lbl" style={{ marginTop: 2 }}>Model</div>
+      <div className="tw-opts" style={{ flexWrap: 'wrap' }}>
+        {cfg.models.map(m => (
+          <button key={m.id} className="tw-opt" aria-pressed={model === m.id} onClick={() => pickModel(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       <div style={{ fontSize: 10.5, color: 'var(--fg-4)', lineHeight: 1.5 }}>
-        Stored in this browser only. Get a key at{' '}
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-          console.anthropic.com
+        Keys stored in this browser only. Get a {cfg.label} key at{' '}
+        <a href={cfg.signup} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+          {cfg.signupLabel}
         </a>.
       </div>
-    </div>
-  );
-}
-
-function ClaudeModelField() {
-  const [model, setModel] = useState(() => localStorage.getItem('vp_anthropic_model') || CLAUDE_MODELS[0].id);
-  const pick = (id) => {
-    setModel(id);
-    localStorage.setItem('vp_anthropic_model', id);
-  };
-  return (
-    <div className="tw-opts" style={{ flexWrap: 'wrap' }}>
-      {CLAUDE_MODELS.map(m => (
-        <button key={m.id} className="tw-opt" aria-pressed={model === m.id} onClick={() => pick(m.id)}>
-          {m.label}
-        </button>
-      ))}
     </div>
   );
 }
@@ -92,13 +159,8 @@ function TweaksPanel({ tweaks, onTweak, onClose }) {
       <div className="tweaks-body">
 
         <div className="tw-row">
-          <div className="tw-lbl">Anthropic API Key</div>
-          <ApiKeyField />
-        </div>
-
-        <div className="tw-row">
-          <div className="tw-lbl">Chat Model</div>
-          <ClaudeModelField />
+          <div className="tw-lbl">AI Provider & Key</div>
+          <ChatProviderField />
         </div>
 
         <div className="tw-row">

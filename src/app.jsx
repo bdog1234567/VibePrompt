@@ -19,20 +19,35 @@ function useLocalStorage(key, def) {
   return [val, setVal];
 }
 
+const PROVIDER_KEY_MAP = {
+  anthropic: { key: 'vp_anthropic_key', label: 'Claude' },
+  openai: { key: 'vp_openai_key', label: 'OpenAI' },
+  gemini: { key: 'vp_gemini_key', label: 'Gemini' },
+};
+
+function currentProviderStatus() {
+  const id = (localStorage.getItem('vp_provider') || 'anthropic').toLowerCase();
+  const cfg = PROVIDER_KEY_MAP[id] || PROVIDER_KEY_MAP.anthropic;
+  return {
+    providerLabel: cfg.label,
+    hasKey: !!(localStorage.getItem(cfg.key) || '').trim(),
+  };
+}
+
 function ApiKeyBanner({ onOpenTweaks }) {
-  const [hasKey, setHasKey] = useState(() => !!(localStorage.getItem('vp_anthropic_key') || '').trim());
+  const [status, setStatus] = useState(currentProviderStatus);
   useEffect(() => {
-    const check = () => setHasKey(!!(localStorage.getItem('vp_anthropic_key') || '').trim());
+    const check = () => setStatus(currentProviderStatus());
     window.addEventListener('storage', check);
     const iv = setInterval(check, 1500);
     return () => { window.removeEventListener('storage', check); clearInterval(iv); };
   }, []);
-  if (hasKey) return null;
+  if (status.hasKey) return null;
   return (
     <div className="api-banner">
       <span className="api-banner-dot" />
       <span className="api-banner-text">
-        <strong>Chat is off</strong> — add your Anthropic API key to turn it on.
+        <strong>Chat is off</strong> — pick a provider (Claude / OpenAI / Gemini) and add a key.
       </span>
       <button className="iconbtn primary" onClick={onOpenTweaks}>
         <Icons.Sliders /> Add key
