@@ -427,36 +427,71 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
   .section-body { grid-template-columns: 1fr; }
 }
 
+/* ========== API KEY BANNER ========== */
+.api-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, oklch(0.30 0.10 45 / 0.55), oklch(0.20 0.06 45 / 0.4));
+  border-bottom: 1px solid var(--accent-line);
+  color: var(--fg-0); font-size: 12.5px;
+  flex-shrink: 0;
+}
+.api-banner-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 10px var(--accent);
+  flex-shrink: 0;
+}
+.api-banner-text { flex: 1; min-width: 0; }
+.api-banner strong { color: var(--accent); }
+
 /* ========== RESPONSIVE: mobile ≤ 760px ========== */
 @media (max-width: 760px) {
   body { font-size: 14px; }
   .app { height: 100dvh; height: 100vh; }
 
-  /* Compact topbar — wrap rows, hide label-only content */
+  /* ---- Single compact topbar row ---- */
   .topbar {
-    flex-wrap: wrap; height: auto; min-height: 48px;
-    padding: 7px 10px; gap: 8px;
-    row-gap: 8px;
+    flex-wrap: nowrap; height: 48px; min-height: 48px;
+    padding: 0 10px; gap: 8px;
+    overflow: hidden;
   }
   .brand {
-    font-size: 18px; padding-right: 8px;
+    font-size: 17px; padding-right: 8px;
+    border-right: 1px solid var(--line);
+    flex-shrink: 0;
   }
-  .brand .mark { width: 18px; height: 18px; }
+  .brand em { display: inline; }
+  .brand .mark { width: 20px; height: 20px; }
 
-  /* Collapse the inline "topbar" used as inner nav into a full-width row */
-  .topbar .topbar {
-    order: 10; flex-basis: 100%; justify-content: flex-start;
-  }
+  /* Mode switch stays, but compact */
+  .mode-switch { flex-shrink: 0; }
+  .mode-switch button { padding: 4px 10px; font-size: 11.5px; }
 
-  /* Status pill (AI Ready) is noisy on small screens */
-  .topbar .ai-ready { display: none; }
+  /* The nested inline-topbar (Editor/Library nav) — hide on mobile,
+     the mobile pane switcher covers those views */
+  .topbar .topbar { display: none !important; }
 
-  .mode-switch button { padding: 4px 9px; font-size: 11.5px; }
+  /* Hide clutter on mobile — clear is in tweaks, AI ready is just decoration */
+  .topbar .iconbtn[title="Clear all fields"] { display: none !important; }
+  .topbar .ai-ready { display: none !important; }
+
   .iconbtn { padding: 5px 9px; font-size: 11.5px; }
 
-  .subbar { padding: 0 10px; }
+  /* ---- Subbar: single-line horizontal scroll ---- */
+  .subbar {
+    padding: 0 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    white-space: nowrap;
+  }
+  .subbar > * { flex-shrink: 0; }
 
-  /* Mobile pane switcher visible */
+  /* ---- API banner on mobile ---- */
+  .api-banner { padding: 8px 10px; font-size: 11.5px; gap: 8px; flex-wrap: wrap; }
+  .api-banner-text { flex: 1 1 auto; min-width: 120px; }
+  .api-banner .iconbtn { padding: 5px 10px; font-size: 11.5px; }
+
+  /* ---- Mobile pane switcher ---- */
   .mobile-panes {
     display: flex; gap: 6px;
     padding: 8px 10px;
@@ -465,46 +500,52 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
     flex-shrink: 0;
   }
 
-  /* Single-column main; only active pane renders */
+  /* ---- Single-column main; only active pane renders ---- */
   .main,
-  .main.hide-chat { grid-template-columns: 1fr; }
+  .main.hide-chat { grid-template-columns: 1fr !important; }
   .pane + .pane { border-left: none; border-top: 1px solid var(--line); }
-  .main .pane { display: none; }
-  .main[data-mpane="chat"] .pane-chat { display: flex; }
-  .main[data-mpane="editor"] .pane-editor { display: flex; }
-  .main[data-mpane="output"] .pane-out { display: flex; }
+  .main > .pane,
+  .main > div.pane { display: none !important; }
+  .main[data-mpane="chat"] > .pane-chat,
+  .main[data-mpane="chat"] > div.pane-chat { display: flex !important; }
+  .main[data-mpane="editor"] > .pane-editor,
+  .main[data-mpane="editor"] > div.pane-editor { display: flex !important; }
+  .main[data-mpane="output"] > .pane-out,
+  .main[data-mpane="output"] > div.pane-out { display: flex !important; }
 
-  /* Editor padding tightened */
+  /* ---- Editor ---- */
   .editor { padding: 14px 14px 40px; }
   .editor-hero h1 { font-size: 26px; }
 
-  /* Output padding + wrap tab row */
+  /* ---- Output ---- */
   .out-body { padding: 12px; }
   .out-text { padding: 12px; padding-right: 70px; font-size: 13px; }
-
-  /* Save bar stacks */
   .save-bar { flex-wrap: wrap; }
   .save-bar input { flex: 1 1 100%; }
 
-  /* Tweaks becomes a bottom sheet */
+  /* ---- Tweaks bottom sheet ---- */
   .tweaks-panel {
     left: 10px; right: 10px; bottom: 10px;
-    width: auto; max-height: 70vh; overflow-y: auto;
+    width: auto; max-height: 75vh; overflow-y: auto;
   }
 
-  /* Statusbar compact */
-  .statusbar { font-size: 10px; gap: 6px; padding: 0 10px; }
-  .statusbar span:nth-of-type(n+5) { display: none; }
-  .statusbar span:last-child { display: inline; }
+  /* ---- Statusbar one-line ---- */
+  .statusbar {
+    font-size: 10px; gap: 6px; padding: 0 10px;
+    white-space: nowrap; overflow: hidden;
+  }
+  .statusbar > * { flex-shrink: 0; }
 
-  /* Chat tweaks */
+  /* ---- Chat ---- */
   .chat-messages { padding: 12px; }
   .chat-compose textarea { min-height: 48px; }
 }
 
-/* ========== RESPONSIVE: narrow phones ≤ 380px ========== */
-@media (max-width: 380px) {
-  .brand { border-right: none; padding-right: 4px; }
-  .topbar .topbar .iconbtn span { display: none; }
-  .mobile-panes button { font-size: 11px; }
+/* ========== RESPONSIVE: narrow phones ≤ 400px ========== */
+@media (max-width: 400px) {
+  .brand { font-size: 16px; padding-right: 6px; }
+  .brand .mark { width: 18px; height: 18px; }
+  .mode-switch button { padding: 3px 8px; font-size: 11px; }
+  .mobile-panes button { font-size: 11px; padding: 6px 2px; }
+  .api-banner strong { display: inline; }
 }
