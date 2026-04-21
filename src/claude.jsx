@@ -101,7 +101,13 @@
       return new Error(`Invalid ${provider} API key — double-check it in Tweaks.`);
     }
     if (resp.status === 429) {
-      return new Error(`Rate limited by ${provider}. Wait a moment and retry.`);
+      const tip = provider === 'Gemini'
+        ? 'Gemini free tier has a low per-minute quota — wait ~30s, or switch to Claude/OpenAI in Tweaks.'
+        : 'Wait a moment and retry.';
+      return new Error(`Rate limited by ${provider}. ${tip}`);
+    }
+    if (resp.status === 404) {
+      return new Error(`${provider} doesn't recognize the selected model. Pick a different one in Tweaks.`);
     }
     return new Error(`${provider} API ${resp.status}: ${detail}`);
   }
