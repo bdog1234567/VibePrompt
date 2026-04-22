@@ -1,6 +1,16 @@
 // app.jsx — main app shell
 const { useState, useEffect, useCallback, useRef } = React;
 
+function PaneDivider({ onMouseDown, onDoubleClick, hidden }) {
+  return (
+    <div
+      className={`pane-divider${hidden ? ' hidden' : ''}`}
+      onMouseDown={hidden ? undefined : onMouseDown}
+      onDoubleClick={hidden ? undefined : onDoubleClick}
+    />
+  );
+}
+
 const EMPTY_FIELDS = {
   subject: '', action: '', setting: '',
   time: '', weather: '', mood: '', colorTone: '',
@@ -61,6 +71,8 @@ function App() {
   const [imageModel, setImageModel] = useLocalStorage('vp_image_model', 'midjourney');
   const [videoModel, setVideoModel] = useLocalStorage('vp_video_model', 'sora');
   const [chatKey, setChatKey] = useState(0);
+  const [paneSizes, setPaneSizes] = useLocalStorage('vp_pane_sizes', { chat: 300, output: 410 });
+  const dragRef = useRef(null);
   const modelId = mode === 'image' ? imageModel : mode === 'video' ? videoModel : 'general';
   const setModelId = mode === 'image' ? setImageModel : mode === 'video' ? setVideoModel : () => {};
   const [fields, setFields] = useLocalStorage('vp_fields', EMPTY_FIELDS);
@@ -147,6 +159,30 @@ function App() {
     if (confirm('Clear chat history?')) setChatKey(k => k + 1);
   };
 
+  const startDrag = (side, e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startSizes = { chat: paneSizes.chat, output: paneSizes.output };
+    const handleMove = (ev) => {
+      const delta = ev.clientX - startX;
+      if (side === 'chat') {
+        setPaneSizes(s => ({ ...s, chat: Math.max(200, Math.min(600, startSizes.chat + delta)) }));
+      } else {
+        setPaneSizes(s => ({ ...s, output: Math.max(260, Math.min(700, startSizes.output - delta)) }));
+      }
+    };
+    const handleUp = () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  };
+
   const showChat = tweaks.showChat !== false;
 
   return (
@@ -228,7 +264,16 @@ function App() {
       </div>
 
       {/* MAIN */}
-      <div className={`main ${showChat ? '' : 'hide-chat'}`} data-mpane={mobilePane} style={{ flex: 1, minHeight: 0 }}>
+      <div
+        className={`main ${showChat ? '' : 'hide-chat'}`}
+        data-mpane={mobilePane}
+        style={{
+          flex: 1, minHeight: 0,
+          gridTemplateColumns: showChat
+            ? `${paneSizes.chat}px 4px 1fr 4px ${paneSizes.output}px`
+            : `0 0 1fr 4px ${paneSizes.output}px`,
+        }}
+      >
 
         {/* CHAT */}
         <div className="pane pane-chat" style={{ background: 'var(--bg-1)' }}>
@@ -256,6 +301,12 @@ function App() {
           />
         </div>
 
+        <PaneDivider
+          hidden={!showChat}
+          onMouseDown={(e) => startDrag('chat', e)}
+          onDoubleClick={() => setPaneSizes(s => ({ ...s, chat: 300 }))}
+        />
+
         {/* EDITOR / LIBRARY */}
         <div className="pane pane-editor" style={{ background: 'var(--bg-0)' }}>
           <div className="pane-head">
@@ -282,6 +333,11 @@ function App() {
             : <LibraryPane library={library} onLoad={loadPrompt} onDelete={deletePrompt} />
           }
         </div>
+
+        <PaneDivider
+          onMouseDown={(e) => startDrag('output', e)}
+          onDoubleClick={() => setPaneSizes(s => ({ ...s, output: 410 }))}
+        />
 
         {/* OUTPUT */}
         <OutputPane compiled={compiled} fields={fields} onSave={savePrompt} />
