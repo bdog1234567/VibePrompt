@@ -60,8 +60,9 @@ function App() {
   const [mode, setMode] = useLocalStorage('vp_mode', window.TWEAKS?.mode || 'video');
   const [imageModel, setImageModel] = useLocalStorage('vp_image_model', 'midjourney');
   const [videoModel, setVideoModel] = useLocalStorage('vp_video_model', 'sora');
-  const modelId = mode === 'image' ? imageModel : videoModel;
-  const setModelId = mode === 'image' ? setImageModel : setVideoModel;
+  const [chatKey, setChatKey] = useState(0);
+  const modelId = mode === 'image' ? imageModel : mode === 'video' ? videoModel : 'general';
+  const setModelId = mode === 'image' ? setImageModel : mode === 'video' ? setVideoModel : () => {};
   const [fields, setFields] = useLocalStorage('vp_fields', EMPTY_FIELDS);
   const [library, setLibrary] = useLocalStorage('vp_library', []);
   const [view, setView] = useState('editor'); // 'editor' | 'library'
@@ -135,7 +136,15 @@ function App() {
   const deletePrompt = (id) => setLibrary(prev => prev.filter(x => x.id !== id));
 
   const clearFields = () => {
-    if (confirm('Clear all fields?')) setFields(EMPTY_FIELDS);
+    if (confirm('Clear all fields, saved prompts, and chat history?')) {
+      setFields(EMPTY_FIELDS);
+      setLibrary([]);
+      setChatKey(k => k + 1);
+    }
+  };
+
+  const clearChat = () => {
+    if (confirm('Clear chat history?')) setChatKey(k => k + 1);
   };
 
   const showChat = tweaks.showChat !== false;
@@ -155,6 +164,9 @@ function App() {
           </button>
           <button aria-pressed={mode === 'video'} onClick={() => setMode('video')}>
             <Icons.Video /> Video
+          </button>
+          <button aria-pressed={mode === 'general'} onClick={() => setMode('general')}>
+            ✦ General
           </button>
         </div>
 
@@ -181,8 +193,8 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button className="iconbtn ghost" onClick={clearFields} title="Clear all fields">
-            <Icons.Trash /> Clear
+          <button className="iconbtn ghost" onClick={clearFields} title="Clear all fields, saves, and chat">
+            <Icons.Trash /> Reset
           </button>
           <button className="iconbtn ghost" onClick={() => setShowTweaks(s => !s)} title="Tweaks">
             <Icons.Sliders /> Tweaks
@@ -224,11 +236,15 @@ function App() {
             <Icons.Chat />
             Creative Director
             <span className="pane-head spacer" />
+            <button className="iconbtn ghost" style={{ padding: '2px 6px' }} onClick={clearChat} title="Clear chat history">
+              <Icons.Trash />
+            </button>
             <button className="iconbtn ghost" style={{ padding: '2px 6px' }} onClick={() => handleTweak('showChat', false)} title="Hide chat">
               <Icons.Close />
             </button>
           </div>
           <ChatPane
+            key={chatKey}
             fields={fields}
             onApply={handleChatApply}
             onApplyAll={(prompt) => {
@@ -279,7 +295,7 @@ function App() {
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px' }}>{mode} mode</span>
         <span style={{ opacity: .4 }}>·</span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
-          {([...( window.IMAGE_MODELS||[]), ...(window.VIDEO_MODELS||[])].find(m => m.id === modelId) || {}).short || modelId}
+          {([...(window.GENERAL_MODEL ? [window.GENERAL_MODEL] : []), ...(window.IMAGE_MODELS||[]), ...(window.VIDEO_MODELS||[])].find(m => m.id === modelId) || {}).short || modelId}
         </span>
         {compiled.natural && (
           <>

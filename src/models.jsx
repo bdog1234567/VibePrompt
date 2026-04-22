@@ -183,8 +183,28 @@ const VIDEO_MODELS = [
   },
 ];
 
+const GENERAL_MODEL = {
+  id: 'general',
+  name: 'General',
+  short: 'General',
+  badge: 'GP',
+  color: 'oklch(0.72 0.14 45)',
+  promptStyle: 'clear natural language, universal',
+  tips: 'Use General mode when you haven\'t chosen a target model yet. Produces a vivid, descriptive prompt in plain natural language that can be copy-pasted into any image or video generator.',
+  briefForLLM: 'No specific model target. Write a vivid, descriptive natural-language prompt usable in any image or video generator. No flags, no model-specific syntax.',
+  targetWords: [25, 55],
+  paramSuffix: () => '',
+};
+
 // Model Selector Component
 function ModelSelector({ mode, selectedModel, onSelect }) {
+  if (mode === 'general') {
+    return (
+      <span style={{ fontSize: 11, color: 'var(--fg-3)', fontStyle: 'italic' }}>
+        General purpose · works with any model
+      </span>
+    );
+  }
   const models = mode === 'image' ? IMAGE_MODELS : VIDEO_MODELS;
   const current = models.find(m => m.id === selectedModel) || models[0];
 
@@ -229,4 +249,4 @@ function ModelSelector({ mode, selectedModel, onSelect }) {
   );
 }
 
-Object.assign(window, { IMAGE_MODELS, VIDEO_MODELS, ModelSelector });
+Object.assign(window, { IMAGE_MODELS, VIDEO_MODELS, GENERAL_MODEL, ModelSelector });

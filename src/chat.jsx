@@ -182,7 +182,8 @@ function PromptCard({ prompt, onSendToGenerator }) {
   );
 }
 
-function ImageSlot({ label, img, inputRef, onPick, onClear }) {
+function ImageSlot({ label, img, onPick, onClear }) {
+  const inputRef = useRef(null);
   const onChange = (e) => {
     const f = e.target.files && e.target.files[0];
     if (f) onPick(f);
@@ -238,22 +239,19 @@ function ImageSlot({ label, img, inputRef, onPick, onClear }) {
 function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
   const [messages, setMessages] = useState([{
     id: 0, role: 'bot',
-    text: `Hey! I'm your creative director. Describe the scene, vibe, or feeling you're going for — I'll help you craft the perfect ${mode === 'video' ? 'video' : 'image'} prompt. After each message I'll generate a ready-to-use prompt you can send straight to the generator.`,
+    text: `Hey! I'm your creative director. Describe the scene, vibe, or feeling you're going for — I'll help you craft the perfect prompt. After each message I'll generate a ready-to-use prompt you can send straight to the generator.`,
     suggestions: [], applied: [], generatedPrompt: null,
   }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  // 'text' | 'single' | 'firstlast'. Image mode is always 'single' (optional ref).
+  // 'text' | 'single' | 'firstlast'. Image/General mode always uses 'aesthetic'.
   const [refMode, setRefMode] = useState('text');
-  const [refs, setRefs] = useState({ single: null, first: null, last: null });
+  const [refs, setRefs] = useState({ single: null, first: null, last: null, aesthetics: [] });
   const [refErr, setRefErr] = useState('');
   const scrollRef = useRef(null);
-  const singlePickRef = useRef(null);
-  const firstPickRef = useRef(null);
-  const lastPickRef = useRef(null);
 
-  // Image mode always uses the single-reference slot.
-  const effectiveRefMode = mode === 'image' ? 'single' : refMode;
+  // Image + general always use aesthetic multi-ref; video uses the refMode selector.
+  const effectiveRefMode = (mode === 'image' || mode === 'general') ? 'aesthetic' : refMode;
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -262,9 +260,10 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
   // Clear mismatched refs when mode/refMode changes.
   useEffect(() => {
     setRefs(prev => {
-      if (effectiveRefMode === 'text') return { single: null, first: null, last: null };
-      if (effectiveRefMode === 'single') return { single: prev.single, first: null, last: null };
-      return { single: null, first: prev.first, last: prev.last };
+      if (effectiveRefMode === 'aesthetic') return { single: null, first: null, last: null, aesthetics: prev.aesthetics || [] };
+      if (effectiveRefMode === 'text') return { single: null, first: null, last: null, aesthetics: [] };
+      if (effectiveRefMode === 'single') return { single: prev.single, first: null, last: null, aesthetics: [] };
+      return { single: null, first: prev.first, last: prev.last, aesthetics: [] };
     });
   }, [effectiveRefMode]);
 
@@ -280,7 +279,41 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
   };
   const clearRef = (slot) => setRefs(prev => ({ ...prev, [slot]: null }));
 
+  const addAesthetic = async (file) => {
+    if (!file || (refs.aesthetics || []).length >= 4) return;
+    setRefErr('');
+    try {
+      const img = await processImageFile(file);
+      setRefs(prev => ({ ...prev, aesthetics: [...(prev.aesthetics || []), img] }));
+    } catch (e) {
+      setRefErr(e?.message || 'Could not attach that image.');
+    }
+  };
+  const replaceAesthetic = async (idx, file) => {
+    if (!file) return;
+    setRefErr('');
+    try {
+      const img = await processImageFile(file);
+      setRefs(prev => {
+        const next = [...(prev.aesthetics || [])];
+        next[idx] = img;
+        return { ...prev, aesthetics: next };
+      });
+    } catch (e) {
+      setRefErr(e?.message || 'Could not attach that image.');
+    }
+  };
+  const clearAesthetic = (idx) => setRefs(prev => ({
+    ...prev,
+    aesthetics: (prev.aesthetics || []).filter((_, i) => i !== idx),
+  }));
+
   const attachedImages = (() => {
+    if (effectiveRefMode === 'aesthetic') {
+      return (refs.aesthetics || []).map((img, i) => ({
+        label: `Style ref ${i + 1}`, slot: `aesthetic_${i}`, ...img,
+      }));
+    }
     if (effectiveRefMode === 'single' && refs.single) {
       return [{ label: 'Reference image', slot: 'single', ...refs.single }];
     }
@@ -306,10 +339,12 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
     setMessages(updatedMessages);
     setInput('');
     // Clear the staged refs now that they're attached to the message.
-    setRefs({ single: null, first: null, last: null });
+    setRefs({ single: null, first: null, last: null, aesthetics: [] });
     setLoading(true);
 
-    const allModels = mode === 'image' ? window.IMAGE_MODELS : window.VIDEO_MODELS;
+    const allModels = mode === 'image' ? window.IMAGE_MODELS
+      : mode === 'video' ? window.VIDEO_MODELS
+      : [window.GENERAL_MODEL];
     const modelDef = allModels.find(m => m.id === modelId) || allModels[0];
     const [minW, maxW] = modelDef.targetWords || [20, 50];
     const modelNote =
@@ -324,11 +359,12 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
       .join('\n');
 
     const contextNote = fieldCtx ? `\nCurrent prompt fields already filled:\n${fieldCtx}` : '';
-    const modeNote = `\nMode: ${mode === 'video' ? 'Video generation' : 'Image generation'}`;
+    const modeNote = `\nMode: ${mode === 'video' ? 'Video generation' : mode === 'general' ? 'General (model TBD)' : 'Image generation'}`;
 
     let refNote = '';
-    if (mode === 'image' && attachedImages.length) {
-      refNote = `\nThe user attached a reference image. Use its subject, style, color palette, composition, and mood to inform the generated prompt.`;
+    if (effectiveRefMode === 'aesthetic' && attachedImages.length) {
+      const count = attachedImages.length;
+      refNote = `\nThe user attached ${count} style reference image${count > 1 ? 's' : ''}. Analyze their shared color palette, lighting, mood, texture, and compositional style. Generate a prompt that recreates this exact aesthetic with an ENTIRELY DIFFERENT subject and setting — unless the user's message specifies what to keep or change.`;
     } else if (mode === 'video' && effectiveRefMode === 'single' && attachedImages.length) {
       refNote = `\nThe user attached a single reference image — this is an image-to-video shot starting from (or inspired by) that image. Describe motion, camera work, and how the scene evolves over time.`;
     } else if (mode === 'video' && effectiveRefMode === 'firstlast' && attachedImages.length >= 1) {
@@ -499,13 +535,36 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
             </div>
           )}
 
-          {effectiveRefMode !== 'text' && (
+          {/* Aesthetic refs — image / general mode: up to 4 style reference images */}
+          {effectiveRefMode === 'aesthetic' && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+              {(refs.aesthetics || []).map((img, i) => (
+                <ImageSlot
+                  key={i}
+                  label={`Style ref ${i + 1}`}
+                  img={img}
+                  onPick={file => replaceAesthetic(i, file)}
+                  onClear={() => clearAesthetic(i)}
+                />
+              ))}
+              {(refs.aesthetics || []).length < 4 && (
+                <ImageSlot
+                  label={`Style ref ${(refs.aesthetics || []).length + 1}`}
+                  img={null}
+                  onPick={addAesthetic}
+                  onClear={() => {}}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Single / first-last refs — video mode only */}
+          {(effectiveRefMode === 'single' || effectiveRefMode === 'firstlast') && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               {effectiveRefMode === 'single' && (
                 <ImageSlot
-                  label={mode === 'image' ? 'Reference image' : 'Reference'}
+                  label="Reference"
                   img={refs.single}
-                  inputRef={singlePickRef}
                   onPick={file => pickImage('single', file)}
                   onClear={() => clearRef('single')}
                 />
@@ -515,14 +574,12 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
                   <ImageSlot
                     label="First frame"
                     img={refs.first}
-                    inputRef={firstPickRef}
                     onPick={file => pickImage('first', file)}
                     onClear={() => clearRef('first')}
                   />
                   <ImageSlot
                     label="Last frame"
                     img={refs.last}
-                    inputRef={lastPickRef}
                     onPick={file => pickImage('last', file)}
                     onClear={() => clearRef('last')}
                   />
