@@ -270,8 +270,8 @@ function App() {
         style={{
           flex: 1, minHeight: 0,
           gridTemplateColumns: showChat
-            ? `${paneSizes.chat}px 4px 1fr 4px ${paneSizes.output}px`
-            : `0 0 1fr 4px ${paneSizes.output}px`,
+            ? `${paneSizes.chat}px 10px 1fr 10px ${paneSizes.output}px`
+            : `0 0 1fr 10px ${paneSizes.output}px`,
         }}
       >
 
@@ -281,6 +281,8 @@ function App() {
             <Icons.Chat />
             Creative Director
             <span className="pane-head spacer" />
+            <button className="iconbtn ghost" style={{ padding: '2px 6px' }} onClick={() => setPaneSizes(s => ({ ...s, chat: Math.max(200, s.chat - 60) }))} title="Shrink chat">‹</button>
+            <button className="iconbtn ghost" style={{ padding: '2px 6px' }} onClick={() => setPaneSizes(s => ({ ...s, chat: Math.min(600, s.chat + 60) }))} title="Expand chat">›</button>
             <button className="iconbtn ghost" style={{ padding: '2px 6px' }} onClick={clearChat} title="Clear chat history">
               <Icons.Trash />
             </button>
@@ -340,7 +342,12 @@ function App() {
         />
 
         {/* OUTPUT */}
-        <OutputPane compiled={compiled} fields={fields} onSave={savePrompt} />
+        <OutputPane
+          compiled={compiled}
+          fields={fields}
+          onSave={savePrompt}
+          onResize={(delta) => setPaneSizes(s => ({ ...s, output: Math.max(260, Math.min(700, s.output + delta)) }))}
+        />
 
       </div>
 

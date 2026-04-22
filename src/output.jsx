@@ -72,7 +72,7 @@ const TABS = [
   { id: 'negative', label: 'Negative', icon: '∅' },
 ];
 
-function OutputPane({ compiled, fields, onSave }) {
+function OutputPane({ compiled, fields, onSave, onResize }) {
   const [tab, setTab] = useState('natural');
   const [saveName, setSaveName] = useState('');
 
@@ -88,6 +88,12 @@ function OutputPane({ compiled, fields, onSave }) {
             {t.label}
           </button>
         ))}
+        {onResize && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 2, paddingRight: 6 }}>
+            <button className="iconbtn ghost" style={{ padding: '2px 6px', fontSize: 14 }} onClick={() => onResize(-60)} title="Shrink output">‹</button>
+            <button className="iconbtn ghost" style={{ padding: '2px 6px', fontSize: 14 }} onClick={() => onResize(+60)} title="Expand output">›</button>
+          </div>
+        )}
       </div>
 
       <div className="out-body">

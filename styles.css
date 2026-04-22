@@ -119,21 +119,33 @@ input, textarea, select { font: inherit; color: inherit; }
 }
 
 .pane-divider {
-  width: 4px;
-  background: var(--line);
+  width: 10px;
+  background: var(--bg-3);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
   cursor: col-resize;
-  transition: background 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
+  user-select: none;
+  transition: background 0.12s;
 }
-.pane-divider:hover { background: var(--accent); }
-.pane-divider::after {
-  content: '';
-  position: absolute;
-  inset: 0 -4px;
+.pane-divider::before {
+  content: '⋮';
+  font-size: 14px;
+  color: var(--fg-3);
+  line-height: 1;
+  letter-spacing: -1px;
+  pointer-events: none;
 }
-.pane-divider.hidden { width: 0; pointer-events: none; }
+.pane-divider:hover {
+  background: color-mix(in oklch, var(--accent) 18%, var(--bg-3));
+}
+.pane-divider:hover::before { color: var(--accent); }
+.pane-divider.hidden { width: 0; border: none; pointer-events: none; overflow: hidden; }
 
 .pane-head {
   display: flex; align-items: center; gap: 8px;
