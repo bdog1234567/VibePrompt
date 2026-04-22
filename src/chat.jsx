@@ -248,7 +248,7 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId, generalSubMode =
   const [loading, setLoading] = useState(false);
   // Video ref mode: 'text' | 'single' | 'firstlast'
   const [refMode, setRefMode] = useState('text');
-  // Image/General-photo route: 'generate' | 'aesthetic' | 'edit' | 'iterate'
+  // Image/General-photo route: 'generate' | 'aesthetic' | 'edit' | 'iterate-camera' | 'iterate-creative'
   const [imageRoute, setImageRoute] = useState('generate');
   const [refs, setRefs] = useState({ single: null, first: null, last: null, aesthetics: [] });
   const [refErr, setRefErr] = useState('');
@@ -380,9 +380,11 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId, generalSubMode =
       const count = attachedImages.length;
       refNote = `\nThe user attached ${count} style reference image${count > 1 ? 's' : ''}. Analyze their shared color palette, lighting, mood, texture, and compositional style. Generate a prompt that recreates this exact aesthetic with an ENTIRELY DIFFERENT subject and setting — unless the user's message specifies what to keep or change.`;
     } else if (imageRoute === 'edit' && attachedImages.length) {
-      refNote = `\nThe user attached an image they want to EDIT. Generate a prompt that describes specific changes to make to this exact image — adjust colors, swap elements, add or remove objects, change lighting, restyle, recompose, etc. Be precise about what to change vs. what to preserve.`;
-    } else if (imageRoute === 'iterate' && attachedImages.length) {
-      refNote = `\nThe user attached their current result to ITERATE on. Generate a prompt that refines or evolves this image — push the concept further, fix visible issues, explore a variation, or adjust specific aspects. Reference what's working and what to change.`;
+      refNote = `\nThe user attached an image they want to EDIT. Generate a prompt that describes specific changes to make to this exact image — adjust colors, swap elements, add or remove objects, change lighting, restyle, recompose, etc. Be precise about what to change vs. what to preserve (face, pose, composition, background as applicable).`;
+    } else if (imageRoute === 'iterate-camera' && attachedImages.length) {
+      refNote = `\nThe user attached an image and wants a DIFFERENT CAMERA ANGLE of the EXACT SAME scene — same subject, same action, same lighting, same setting, same mood. Only the camera position and framing change. Suggest a specific new angle: low angle looking up, overhead bird's-eye, wide establishing, extreme close-up, over-the-shoulder, Dutch tilt, profile, 3/4, rear, etc. Be precise about shot type, camera height, distance, direction, and lens. Do not invent new subjects or change the scene.`;
+    } else if (imageRoute === 'iterate-creative' && attachedImages.length) {
+      refNote = `\nThe user attached an image and wants a CREATIVE ITERATION — a fresh take on the same core concept. Preserve the central subject or theme but push a new creative direction: different mood, different art style, different narrative beat, alternate lighting/time, bolder or stranger or more refined treatment. Briefly call out what you are keeping versus reinventing so the user can steer.`;
     } else if (effectiveMode === 'video' && effectiveRefMode === 'single' && attachedImages.length) {
       refNote = `\nThe user attached a single reference image — this is an image-to-video shot starting from (or inspired by) that image. Describe motion, camera work, and how the scene evolves over time.`;
     } else if (effectiveMode === 'video' && effectiveRefMode === 'firstlast' && attachedImages.length >= 1) {
@@ -540,7 +542,8 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId, generalSubMode =
                 ['generate', 'Generate'],
                 ['aesthetic', 'Style Match'],
                 ['edit', 'Edit Image'],
-                ['iterate', 'Iterate'],
+                ['iterate-camera', 'Iterate Camera'],
+                ['iterate-creative', 'Iterate Creative'],
               ].map(([id, label]) => (
                 <button key={id} className="tw-opt" aria-pressed={imageRoute === id}
                   onClick={() => setImageRoute(id)} style={{ fontSize: 10.5 }}>
@@ -594,7 +597,12 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId, generalSubMode =
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               {effectiveRefMode === 'single' && (
                 <ImageSlot
-                  label={imageRoute === 'edit' ? 'Image to edit' : imageRoute === 'iterate' ? 'Previous result' : 'Reference'}
+                  label={
+                    imageRoute === 'edit' ? 'Image to edit'
+                    : imageRoute === 'iterate-camera' ? 'Original shot'
+                    : imageRoute === 'iterate-creative' ? 'Original image'
+                    : 'Reference'
+                  }
                   img={refs.single}
                   onPick={file => pickImage('single', file)}
                   onClear={() => clearRef('single')}
