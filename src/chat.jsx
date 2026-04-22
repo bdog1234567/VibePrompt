@@ -39,20 +39,26 @@ const STARTERS = [
 
 const SYSTEM_PROMPT = `You are a creative director and prompt engineer for AI image/video generation. Be concise — rambling is a failure mode, especially on free-tier LLMs.
 
-Respond in EXACTLY this structure, nothing more:
+CRITICAL OUTPUT DISCIPLINE:
+- Your response MUST start with the literal line beginning with "Reaction:". NO text before it.
+- DO NOT output drafts, rewrites, brainstorm lists, idea enumerations ("Idea 1/2/3"), word-count checks, constraint checks, or any reasoning, planning, or "wait let me reconsider" passages. No scratch work. Produce the final answer on the first try.
+- DO NOT number words or list them. DO NOT repeat the prompt twice.
+- No section headings other than the five below. No preamble. No closing remarks.
+
+Respond in EXACTLY this structure:
 1. Reaction: ONE short sentence (≤12 words).
 2. Direction: ONE OR TWO short sentences expanding the creative angle.
 3. "Suggestions:" block — 3-5 lines, each formatted exactly "Field: Value". Values ≤8 words each.
 4. A literal line containing only: ---
-5. GENERATED PROMPT: <the prompt>
+5. GENERATED PROMPT: <the prompt, on one line>
 
 The GENERATED PROMPT MUST:
-- Fit the word budget given in the model brief below. Count your words.
+- Fit the word budget given in the model brief below. Silently keep within it — do not show counts.
 - Follow the model's prompt style exactly.
 - Include ONLY elements the user asked for or that the model brief calls out.
 - Never pad with lists of camera bodies, lenses, film stocks, or quality-booster adjectives the user did not request.
 
-No headings, no bullet lists, no closing remarks. Never skip the GENERATED PROMPT block.`;
+Never skip the GENERATED PROMPT block.`;
 
 function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -104,15 +110,33 @@ function parseSuggestions(text) {
 }
 
 function parseGeneratedPrompt(text) {
-  const match = text.match(/---\s*\n?GENERATED PROMPT:\s*(.+?)(?:\n\n|$)/s);
-  if (match) return match[1].trim();
-  // fallback: look for it anywhere
-  const fallback = text.match(/GENERATED PROMPT:\s*(.+?)(?:\n\n|$)/s);
-  return fallback ? fallback[1].trim() : null;
+  // Use the LAST occurrence — some models produce drafts then a final.
+  const matches = [...text.matchAll(/GENERATED PROMPT:\s*([\s\S]+?)(?:\n\s*\n|$)/gi)];
+  if (!matches.length) return null;
+  return matches[matches.length - 1][1].trim();
 }
 
 function cleanText(text) {
-  return text.replace(/---\s*\n?GENERATED PROMPT:.*$/s, '').trim();
+  // 1. Strip everything from "GENERATED PROMPT:" to end.
+  let out = text.replace(/(?:\n---\s*\n)?GENERATED PROMPT:[\s\S]*$/i, '').trim();
+  // 2. If there are multiple "Reaction:" lines (model leaked drafts), keep
+  //    only from the LAST one forward — that's the final answer.
+  const reactionMatches = [...out.matchAll(/^[ \t]*Reaction\s*:/gmi)];
+  if (reactionMatches.length > 1) {
+    const last = reactionMatches[reactionMatches.length - 1];
+    out = out.slice(last.index).trim();
+  } else if (reactionMatches.length === 1 && reactionMatches[0].index > 0) {
+    // One Reaction but preceded by scratch — trim anything before it.
+    out = out.slice(reactionMatches[0].index).trim();
+  }
+  // 3. Remove obvious scratchpad patterns that sometimes slip through.
+  out = out
+    .replace(/^\s*\*?\s*(Draft|Revised Prompt|Word count check|Checking constraints|Selection|Prompt Construction|Idea \d+)[: ].*$/gmi, '')
+    .replace(/^\s*\d+\.\s+\S+\s*$/gm, '') // single-word numbered lines (word counting)
+    .replace(/^\s*Total:\s*\d+\s*words?.*$/gmi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return out;
 }
 
 function mapSuggestionToField(label, value) {
