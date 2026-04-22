@@ -458,9 +458,17 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId, generalSubMode =
       const displayText = cleanText(reply);
       const sugs = parseSuggestions(displayText);
 
+      // The model sometimes returns an empty reply (rate limit soft-fail,
+      // refusal with no text, etc.). Surface that explicitly instead of
+      // letting an empty bubble appear like the chat just froze.
+      const hasSomething = displayText.trim() || generatedPrompt || sugs.length;
+      const finalText = hasSomething
+        ? displayText
+        : '⚠️ The model returned an empty response. Try resending, or check your API key / rate limit in Tweaks.';
+
       setMessages(prev => [...prev, {
         id: Date.now() + 1, role: 'bot',
-        text: displayText,
+        text: finalText,
         suggestions: sugs, applied: [],
         generatedPrompt,
       }]);
