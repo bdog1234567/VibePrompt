@@ -39,6 +39,13 @@
       defaultModel: 'gemini-2.5-flash',
       call: callGemini,
     },
+    openrouter: {
+      label: 'OpenRouter',
+      storageKey: 'vp_openrouter_key',
+      storageModel: 'vp_openrouter_model',
+      defaultModel: 'anthropic/claude-haiku-4.5',
+      call: callOpenRouter,
+    },
   };
 
   // Translate our generic message content (string OR array of
@@ -105,6 +112,27 @@
     return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
   }
 
+  async function callOpenRouter({ system, messages, model, apiKey }) {
+    // OpenRouter is OpenAI-compatible on the chat-completions endpoint.
+    const openaiMessages = [
+      { role: 'system', content: system },
+      ...messages.map(m => ({ role: m.role, content: toOpenAIContent(m.content) })),
+    ];
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'authorization': `Bearer ${apiKey}`,
+        'http-referer': window.location.origin || 'https://vibeprompt.app',
+        'x-title': 'VibePrompt',
+      },
+      body: JSON.stringify({ model, messages: openaiMessages, max_tokens: 700 }),
+    });
+    if (!resp.ok) throw await apiError(resp, 'OpenRouter');
+    const data = await resp.json();
+    return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  }
+
   async function callGemini({ system, messages, model, apiKey }) {
     const contents = messages.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
@@ -159,6 +187,7 @@
       anthropic: [/haiku-4/i, /sonnet-4/i, /haiku/i, /sonnet/i],
       openai: [/^gpt-5.*mini/i, /^gpt-4o-mini/i, /^gpt-4o/i, /^gpt-/i],
       gemini: [/2\.5-flash$/i, /2\.5-flash/i, /flash/i, /pro/i],
+      openrouter: [/anthropic\/claude-haiku/i, /anthropic\/claude-sonnet/i, /openai\/gpt-.*mini/i, /google\/gemini/i],
     })[providerId] || [];
     for (const rx of prefer) {
       const hit = ids.find(id => rx.test(id));
@@ -230,6 +259,15 @@
         .filter(id => !/embedding|whisper|tts|audio|image|dall-e|moderation|realtime|transcribe/i.test(id))
         .sort();
       return chatty.map(id => ({ id, label: id }));
+    }
+
+    if (providerId === 'openrouter') {
+      const resp = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { 'authorization': `Bearer ${apiKey}` },
+      });
+      if (!resp.ok) throw await apiError(resp, 'OpenRouter');
+      const data = await resp.json();
+      return (data.data || []).map(m => ({ id: m.id, label: m.name || m.id }));
     }
 
     if (providerId === 'gemini') {

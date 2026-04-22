@@ -56,6 +56,22 @@ const PROVIDERS = [
       { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (free, fastest)' },
     ],
   },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    keyStorage: 'vp_openrouter_key',
+    modelStorage: 'vp_openrouter_model',
+    placeholder: 'sk-or-...',
+    signup: 'https://openrouter.ai/keys',
+    signupLabel: 'openrouter.ai',
+    models: [
+      { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (via OpenRouter)' },
+      { id: 'anthropic/claude-haiku-4.5', label: 'Claude Haiku 4.5 (via OpenRouter)' },
+      { id: 'openai/gpt-5-mini', label: 'GPT-5 mini (via OpenRouter)' },
+      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (via OpenRouter)' },
+      { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B (via OpenRouter)' },
+    ],
+  },
 ];
 
 function loadCachedModels(providerId) {
