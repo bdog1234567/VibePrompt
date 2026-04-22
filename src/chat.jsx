@@ -37,18 +37,22 @@ const STARTERS = [
   "Macro product shot, studio",
 ];
 
-const SYSTEM_PROMPT = `You are a creative director and prompt engineer specializing in AI image and video generation. Your job is to help users develop rich, specific prompts optimized for their chosen AI model.
+const SYSTEM_PROMPT = `You are a creative director and prompt engineer for AI image/video generation. Be concise — rambling is a failure mode, especially on free-tier LLMs.
 
-When a user describes their creative vision, do the following:
-1. A brief enthusiastic reaction (1 sentence)
-2. 2-3 sentences expanding on the creative direction
-3. A "Suggestions:" block with 4-6 concrete field values, formatted exactly as: Field: Value
-4. Then ALWAYS end every response with this block (no exceptions):
+Respond in EXACTLY this structure, nothing more:
+1. Reaction: ONE short sentence (≤12 words).
+2. Direction: ONE OR TWO short sentences expanding the creative angle.
+3. "Suggestions:" block — 3-5 lines, each formatted exactly "Field: Value". Values ≤8 words each.
+4. A literal line containing only: ---
+5. GENERATED PROMPT: <the prompt>
 
----
-GENERATED PROMPT: [write a complete, ready-to-use prompt optimized for the specific model noted in the system context. Follow that model's prompt style exactly.]
+The GENERATED PROMPT MUST:
+- Fit the word budget given in the model brief below. Count your words.
+- Follow the model's prompt style exactly.
+- Include ONLY elements the user asked for or that the model brief calls out.
+- Never pad with lists of camera bodies, lenses, film stocks, or quality-booster adjectives the user did not request.
 
-Keep the generated prompt specific and vivid. Never skip the GENERATED PROMPT block.`;
+No headings, no bullet lists, no closing remarks. Never skip the GENERATED PROMPT block.`;
 
 function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -307,7 +311,12 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
 
     const allModels = mode === 'image' ? window.IMAGE_MODELS : window.VIDEO_MODELS;
     const modelDef = allModels.find(m => m.id === modelId) || allModels[0];
-    const modelNote = `\nTarget model: ${modelDef.name} (${modelDef.short})\nPrompt style for this model: ${modelDef.promptStyle}\nModel-specific tips: ${modelDef.tips}`;
+    const [minW, maxW] = modelDef.targetWords || [20, 50];
+    const modelNote =
+      `\nTarget model: ${modelDef.name}` +
+      `\nPrompt style: ${modelDef.promptStyle}` +
+      `\nModel brief: ${modelDef.briefForLLM || modelDef.tips}` +
+      `\nWord budget for GENERATED PROMPT: ${minW}-${maxW} words. Count them.`;
 
     const fieldCtx = Object.entries(fields)
       .filter(([k, v]) => v && (typeof v === 'string' ? v.trim() : Array.isArray(v) ? v.length > 0 : true))
