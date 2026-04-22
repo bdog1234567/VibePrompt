@@ -97,14 +97,22 @@ function CopyBtn({ text, small }) {
   );
 }
 
+const SUGGESTION_SKIP_LABELS = new Set([
+  'reaction', 'direction', 'suggestions', 'generated prompt', 'prompt', 'note', 'notes',
+]);
+
 function parseSuggestions(text) {
   const sugs = [];
   const lines = text.split('\n');
   lines.forEach(line => {
     const m = line.match(/^[-•*]?\s*([A-Za-z\s\/]+):\s*(.+)$/);
-    if (m && m[2].trim().length > 0 && m[2].trim().length < 100 && !m[1].includes('GENERATED') && !m[1].includes('http')) {
-      sugs.push({ label: m[1].trim(), value: m[2].trim() });
-    }
+    if (!m) return;
+    const label = m[1].trim();
+    const value = m[2].trim();
+    if (!value || value.length >= 100) return;
+    if (SUGGESTION_SKIP_LABELS.has(label.toLowerCase())) return;
+    if (label.toUpperCase().includes('GENERATED') || value.includes('http')) return;
+    sugs.push({ label, value });
   });
   return sugs.slice(0, 6);
 }
@@ -413,13 +421,13 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId, generalSubMode =
       refNote = `\nThe user attached first-frame and/or last-frame references for a first-last-frame video. Describe a smooth motion/transition that starts at the first frame and ends at the last frame — camera moves, subject action, lighting changes.`;
     }
 
-    // Flux 2 responds strongly to camera/optics language. When editing or style-matching
-    // on a Flux 2 model, push the chatbot to analyze the attached image(s) in those terms
-    // and bake concrete camera vocabulary into the generated prompt.
+    // Flux 2 responds to camera/optics language — steer edit/style-match toward it.
+    // Keep this brief tight: a long system prompt causes the model to eat its output
+    // budget on Reaction/Direction and truncate before GENERATED PROMPT.
     const isFlux = modelId === 'flux' || modelId === 'flux-max';
     const fluxCameraRoute = isFlux && attachedImages.length && (imageRoute === 'edit' || effectiveRefMode === 'aesthetic');
     if (fluxCameraRoute) {
-      refNote += `\nFLUX 2 CAMERA FOCUS: this model rewards concrete photographic vocabulary. First, read the attached image${attachedImages.length > 1 ? 's' : ''} through a photographer's eye and name what you see — likely camera body or format (e.g. medium-format Hasselblad, Leica M11, Sony A7R V, 35mm film SLR), focal length (wide 24-35mm, normal 50mm, portrait 85mm, tele 135mm+), aperture and depth of field (f/1.4 shallow with bokeh vs f/8 deep), focus behavior (subject-sharp with falloff, rack focus, tilt-shift plane), shutter feel (frozen vs motion blur), film stock or sensor look (Portra 400, Cinestill 800T, digital clean), and lighting direction/quality. Then write the generated prompt so these camera terms are explicit in the prose — ${imageRoute === 'edit' ? 'preserve the original optics unless the user asks to change them, and describe edits in the same photographic language' : 'carry the source optics into the new subject so the style match reads as the same camera and lens world'}. Pick AT MOST one of {body, focal length, film stock} to foreground — do not stack all three.`;
+      refNote += `\nFLUX 2 CAMERA FOCUS: name the source image's optics — body/format, focal length, aperture, focus, film stock, light — and carry that vocabulary into the generated prompt. Pick ONE of {body, focal length, film stock}; don't stack.`;
     }
 
     // Build provider-ready history. Messages may carry images on user turns.
