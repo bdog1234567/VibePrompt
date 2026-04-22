@@ -236,7 +236,9 @@ function ImageSlot({ label, img, onPick, onClear }) {
   );
 }
 
-function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
+function ChatPane({ fields, onApply, onApplyAll, mode, modelId, generalSubMode = 'photo' }) {
+  // When General mode, treat as photo or video for ref/route logic
+  const effectiveMode = mode === 'general' ? (generalSubMode === 'video' ? 'video' : 'image') : mode;
   const [messages, setMessages] = useState([{
     id: 0, role: 'bot',
     text: `Hey! I'm your creative director. Describe the scene, vibe, or feeling you're going for — I'll help you craft the perfect prompt. After each message I'll generate a ready-to-use prompt you can send straight to the generator.`,
@@ -244,14 +246,22 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
   }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  // 'text' | 'single' | 'firstlast'. Image/General mode always uses 'aesthetic'.
+  // Video ref mode: 'text' | 'single' | 'firstlast'
   const [refMode, setRefMode] = useState('text');
+  // Image/General-photo route: 'generate' | 'aesthetic' | 'edit' | 'iterate'
+  const [imageRoute, setImageRoute] = useState('generate');
   const [refs, setRefs] = useState({ single: null, first: null, last: null, aesthetics: [] });
   const [refErr, setRefErr] = useState('');
   const scrollRef = useRef(null);
 
-  // Image + general always use aesthetic multi-ref; video uses the refMode selector.
-  const effectiveRefMode = (mode === 'image' || mode === 'general') ? 'aesthetic' : refMode;
+  // Derive which ref slot mode to use
+  const effectiveRefMode = (() => {
+    if (effectiveMode === 'video') return refMode;
+    // image / general-photo
+    if (imageRoute === 'generate') return 'text';
+    if (imageRoute === 'aesthetic') return 'aesthetic';
+    return 'single'; // edit + iterate both use one slot
+  })();
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -342,8 +352,8 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
     setRefs({ single: null, first: null, last: null, aesthetics: [] });
     setLoading(true);
 
-    const allModels = mode === 'image' ? window.IMAGE_MODELS
-      : mode === 'video' ? window.VIDEO_MODELS
+    const allModels = mode !== 'general'
+      ? (effectiveMode === 'video' ? window.VIDEO_MODELS : window.IMAGE_MODELS)
       : [window.GENERAL_MODEL];
     const modelDef = allModels.find(m => m.id === modelId) || allModels[0];
     const [minW, maxW] = modelDef.targetWords || [20, 50];
@@ -359,15 +369,23 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
       .join('\n');
 
     const contextNote = fieldCtx ? `\nCurrent prompt fields already filled:\n${fieldCtx}` : '';
-    const modeNote = `\nMode: ${mode === 'video' ? 'Video generation' : mode === 'general' ? 'General (model TBD)' : 'Image generation'}`;
+    const modeNote = `\nMode: ${
+      effectiveMode === 'video'
+        ? (mode === 'general' ? 'General video (model TBD)' : 'Video generation')
+        : (mode === 'general' ? 'General photo (model TBD)' : 'Image generation')
+    }`;
 
     let refNote = '';
     if (effectiveRefMode === 'aesthetic' && attachedImages.length) {
       const count = attachedImages.length;
       refNote = `\nThe user attached ${count} style reference image${count > 1 ? 's' : ''}. Analyze their shared color palette, lighting, mood, texture, and compositional style. Generate a prompt that recreates this exact aesthetic with an ENTIRELY DIFFERENT subject and setting — unless the user's message specifies what to keep or change.`;
-    } else if (mode === 'video' && effectiveRefMode === 'single' && attachedImages.length) {
+    } else if (imageRoute === 'edit' && attachedImages.length) {
+      refNote = `\nThe user attached an image they want to EDIT. Generate a prompt that describes specific changes to make to this exact image — adjust colors, swap elements, add or remove objects, change lighting, restyle, recompose, etc. Be precise about what to change vs. what to preserve.`;
+    } else if (imageRoute === 'iterate' && attachedImages.length) {
+      refNote = `\nThe user attached their current result to ITERATE on. Generate a prompt that refines or evolves this image — push the concept further, fix visible issues, explore a variation, or adjust specific aspects. Reference what's working and what to change.`;
+    } else if (effectiveMode === 'video' && effectiveRefMode === 'single' && attachedImages.length) {
       refNote = `\nThe user attached a single reference image — this is an image-to-video shot starting from (or inspired by) that image. Describe motion, camera work, and how the scene evolves over time.`;
-    } else if (mode === 'video' && effectiveRefMode === 'firstlast' && attachedImages.length >= 1) {
+    } else if (effectiveMode === 'video' && effectiveRefMode === 'firstlast' && attachedImages.length >= 1) {
       refNote = `\nThe user attached first-frame and/or last-frame references for a first-last-frame video. Describe a smooth motion/transition that starts at the first frame and ends at the last frame — camera moves, subject action, lighting changes.`;
     }
 
@@ -515,20 +533,33 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
           </div>
         )}
         <div className="chat-compose">
-          {mode === 'video' && (
+          {/* Image / General-photo: route selector */}
+          {effectiveMode === 'image' && (
+            <div className="tw-opts" style={{ flexWrap: 'wrap', marginBottom: 6 }}>
+              {[
+                ['generate', 'Generate'],
+                ['aesthetic', 'Style Match'],
+                ['edit', 'Edit Image'],
+                ['iterate', 'Iterate'],
+              ].map(([id, label]) => (
+                <button key={id} className="tw-opt" aria-pressed={imageRoute === id}
+                  onClick={() => setImageRoute(id)} style={{ fontSize: 10.5 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Video / General-video: ref mode selector */}
+          {effectiveMode === 'video' && (
             <div className="tw-opts" style={{ flexWrap: 'wrap', marginBottom: 6 }}>
               {[
                 ['text', 'Text'],
                 ['single', 'Image → video'],
                 ['firstlast', 'First + Last'],
               ].map(([id, label]) => (
-                <button
-                  key={id}
-                  className="tw-opt"
-                  aria-pressed={refMode === id}
-                  onClick={() => setRefMode(id)}
-                  style={{ fontSize: 10.5 }}
-                >
+                <button key={id} className="tw-opt" aria-pressed={refMode === id}
+                  onClick={() => setRefMode(id)} style={{ fontSize: 10.5 }}>
                   {label}
                 </button>
               ))}
@@ -558,12 +589,12 @@ function ChatPane({ fields, onApply, onApplyAll, mode, modelId }) {
             </div>
           )}
 
-          {/* Single / first-last refs — video mode only */}
+          {/* Single / first-last refs — video mode or image edit/iterate */}
           {(effectiveRefMode === 'single' || effectiveRefMode === 'firstlast') && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               {effectiveRefMode === 'single' && (
                 <ImageSlot
-                  label="Reference"
+                  label={imageRoute === 'edit' ? 'Image to edit' : imageRoute === 'iterate' ? 'Previous result' : 'Reference'}
                   img={refs.single}
                   onPick={file => pickImage('single', file)}
                   onClear={() => clearRef('single')}

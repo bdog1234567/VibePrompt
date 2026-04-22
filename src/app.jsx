@@ -72,6 +72,7 @@ function App() {
   const [videoModel, setVideoModel] = useLocalStorage('vp_video_model', 'sora');
   const [chatKey, setChatKey] = useState(0);
   const [paneSizes, setPaneSizes] = useLocalStorage('vp_pane_sizes', { chat: 300, output: 410 });
+  const [generalSubMode, setGeneralSubMode] = useLocalStorage('vp_general_sub', 'photo');
   const dragRef = useRef(null);
   const modelId = mode === 'image' ? imageModel : mode === 'video' ? videoModel : 'general';
   const setModelId = mode === 'image' ? setImageModel : mode === 'video' ? setVideoModel : () => {};
@@ -245,6 +246,12 @@ function App() {
       {/* MODEL SUBBAR */}
       <div className="subbar">
         <ModelSelector mode={mode} selectedModel={modelId} onSelect={setModelId} />
+        {mode === 'general' && (
+          <div className="tw-opts" style={{ marginLeft: 12, gap: 3 }}>
+            <button className="tw-opt" aria-pressed={generalSubMode === 'photo'} onClick={() => setGeneralSubMode('photo')} style={{ fontSize: 11 }}>📷 Photo</button>
+            <button className="tw-opt" aria-pressed={generalSubMode === 'video'} onClick={() => setGeneralSubMode('video')} style={{ fontSize: 11 }}>🎬 Video</button>
+          </div>
+        )}
       </div>
 
       {/* API KEY BANNER */}
@@ -300,6 +307,7 @@ function App() {
             }}
             mode={mode}
             modelId={modelId}
+            generalSubMode={generalSubMode}
           />
         </div>
 
