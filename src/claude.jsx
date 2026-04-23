@@ -87,7 +87,7 @@
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify({ model, max_tokens: 700, system, messages: anthMsgs }),
+      body: JSON.stringify({ model, max_tokens: 1500, system, messages: anthMsgs }),
     });
     if (!resp.ok) throw await apiError(resp, 'Anthropic');
     const data = await resp.json();
@@ -105,7 +105,7 @@
         'content-type': 'application/json',
         'authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ model, messages: openaiMessages, max_tokens: 700 }),
+      body: JSON.stringify({ model, messages: openaiMessages, max_tokens: 1500 }),
     });
     if (!resp.ok) throw await apiError(resp, 'OpenAI');
     const data = await resp.json();
@@ -126,7 +126,7 @@
         'http-referer': window.location.origin || 'https://vibeprompt.app',
         'x-title': 'VibePrompt',
       },
-      body: JSON.stringify({ model, messages: openaiMessages, max_tokens: 700 }),
+      body: JSON.stringify({ model, messages: openaiMessages, max_tokens: 1500 }),
     });
     if (!resp.ok) throw await apiError(resp, 'OpenRouter');
     const data = await resp.json();
@@ -141,7 +141,7 @@
     const body = {
       contents,
       systemInstruction: { parts: [{ text: system }] },
-      generationConfig: { maxOutputTokens: 700 },
+      generationConfig: { maxOutputTokens: 1500 },
     };
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const resp = await fetch(url, {
