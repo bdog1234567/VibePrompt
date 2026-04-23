@@ -33,13 +33,16 @@ const PROVIDER_KEY_MAP = {
   anthropic: { key: 'vp_anthropic_key', label: 'Claude' },
   openai: { key: 'vp_openai_key', label: 'OpenAI' },
   gemini: { key: 'vp_gemini_key', label: 'Gemini' },
+  openrouter: { key: 'vp_openrouter_key', label: 'OpenRouter' },
 };
 
 function currentProviderStatus() {
   const id = (localStorage.getItem('vp_provider') || 'anthropic').toLowerCase();
   const cfg = PROVIDER_KEY_MAP[id] || PROVIDER_KEY_MAP.anthropic;
+  const apiMode = (localStorage.getItem('vp_api_mode') || 'auto').toLowerCase();
   return {
     providerLabel: cfg.label,
+    apiMode,
     hasKey: !!(localStorage.getItem(cfg.key) || '').trim(),
   };
 }
@@ -52,12 +55,12 @@ function ApiKeyBanner({ onOpenTweaks }) {
     const iv = setInterval(check, 1500);
     return () => { window.removeEventListener('storage', check); clearInterval(iv); };
   }, []);
-  if (status.hasKey) return null;
+  if (status.apiMode !== 'browser' || status.hasKey) return null;
   return (
     <div className="api-banner">
       <span className="api-banner-dot" />
       <span className="api-banner-text">
-        <strong>Chat is off</strong> — pick a provider (Claude / OpenAI / Gemini) and add a key.
+        <strong>Chat is off</strong> — pick a provider and add a browser fallback key.
       </span>
       <button className="iconbtn primary" onClick={onOpenTweaks}>
         <Icons.Sliders /> Add key

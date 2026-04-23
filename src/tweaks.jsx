@@ -85,6 +85,8 @@ function loadCachedModels(providerId) {
 
 function ChatProviderField() {
   const [provider, setProvider] = useState(() => localStorage.getItem('vp_provider') || 'anthropic');
+  const [apiMode, setApiMode] = useState(() => localStorage.getItem('vp_api_mode') || 'auto');
+  const [accessToken, setAccessToken] = useState(() => localStorage.getItem('vp_access_token') || '');
   const cfg = PROVIDERS.find(p => p.id === provider) || PROVIDERS[0];
 
   const [key, setKey] = useState(() => localStorage.getItem(cfg.keyStorage) || '');
@@ -92,6 +94,7 @@ function ChatProviderField() {
   const [model, setModel] = useState(() => localStorage.getItem(cfg.modelStorage) || (loadCachedModels(cfg.id) || cfg.models)[0].id);
   const [show, setShow] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [tokenSaved, setTokenSaved] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState('');
 
@@ -109,6 +112,10 @@ function ChatProviderField() {
     setProvider(id);
     localStorage.setItem('vp_provider', id);
   };
+  const pickApiMode = (id) => {
+    setApiMode(id);
+    localStorage.setItem('vp_api_mode', id);
+  };
   const pickModel = (id) => {
     setModel(id);
     localStorage.setItem(cfg.modelStorage, id);
@@ -122,8 +129,17 @@ function ChatProviderField() {
     setKey('');
     localStorage.removeItem(cfg.keyStorage);
   };
+  const saveAccessToken = () => {
+    localStorage.setItem('vp_access_token', accessToken.trim());
+    setTokenSaved(true);
+    setTimeout(() => setTokenSaved(false), 1500);
+  };
+  const clearAccessToken = () => {
+    setAccessToken('');
+    localStorage.removeItem('vp_access_token');
+  };
   const refreshModels = async () => {
-    if (!key.trim() || refreshing) return;
+    if ((apiMode === 'browser' && !key.trim()) || refreshing) return;
     setRefreshing(true);
     setRefreshMsg('');
     try {
@@ -157,6 +173,52 @@ function ChatProviderField() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="tw-lbl">Connection</div>
+      <div className="tw-opts" style={{ flexWrap: 'wrap' }}>
+        {[
+          ['proxy', 'Hosted API'],
+          ['auto', 'Hosted + fallback'],
+          ['browser', 'Browser keys'],
+        ].map(([id, label]) => (
+          <button key={id} className="tw-opt" aria-pressed={apiMode === id} onClick={() => pickApiMode(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {apiMode !== 'browser' && (
+        <>
+          <div className="tw-lbl">App access token</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type={show ? 'text' : 'password'}
+              value={accessToken}
+              onChange={e => setAccessToken(e.target.value)}
+              placeholder="Optional Vercel access token"
+              spellCheck={false}
+              autoComplete="off"
+              style={{
+                flex: 1, minWidth: 0,
+                background: 'var(--bg-3)', color: 'var(--fg-0)',
+                border: '1px solid var(--line-2)', borderRadius: 6,
+                padding: '6px 8px', fontSize: 12,
+                fontFamily: 'var(--font-mono)',
+              }}
+            />
+            <button className="tw-opt" onClick={() => setShow(s => !s)} title={show ? 'Hide' : 'Show'}>
+              {show ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="tw-opt" aria-pressed={tokenSaved} onClick={saveAccessToken}>
+              {tokenSaved ? '✓ Saved' : 'Save token'}
+            </button>
+            <button className="tw-opt" onClick={clearAccessToken} disabled={!accessToken}>Clear</button>
+          </div>
+        </>
+      )}
+
+      <div className="tw-lbl">Provider</div>
       <div className="tw-opts" style={{ flexWrap: 'wrap' }}>
         {PROVIDERS.map(p => (
           <button
@@ -170,6 +232,9 @@ function ChatProviderField() {
         ))}
       </div>
 
+      {apiMode !== 'proxy' && (
+        <>
+          <div className="tw-lbl">Browser fallback key</div>
       <div style={{ display: 'flex', gap: 6 }}>
         <input
           type={show ? 'text' : 'password'}
@@ -197,13 +262,15 @@ function ChatProviderField() {
         </button>
         <button className="tw-opt" onClick={clearKey} disabled={!key}>Clear</button>
       </div>
+        </>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
         <div className="tw-lbl" style={{ flex: 1 }}>Model</div>
         <button
           className="tw-opt"
           onClick={refreshModels}
-          disabled={!key.trim() || refreshing}
+          disabled={(apiMode === 'browser' && !key.trim()) || refreshing}
           title="Fetch available models from the provider"
           style={{ fontSize: 10.5 }}
         >
@@ -232,7 +299,7 @@ function ChatProviderField() {
       )}
 
       <div style={{ fontSize: 10.5, color: 'var(--fg-4)', lineHeight: 1.5 }}>
-        Keys stored in this browser only. Get a {cfg.label} key at{' '}
+        Hosted API keeps provider keys on Vercel. Browser fallback keys stay on this device only. Get a {cfg.label} key at{' '}
         <a href={cfg.signup} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
           {cfg.signupLabel}
         </a>.
@@ -251,7 +318,7 @@ function TweaksPanel({ tweaks, onTweak, onClose }) {
       <div className="tweaks-body">
 
         <div className="tw-row">
-          <div className="tw-lbl">AI Provider & Key</div>
+          <div className="tw-lbl">AI Provider & Access</div>
           <ChatProviderField />
         </div>
 

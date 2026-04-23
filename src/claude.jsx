@@ -1,13 +1,14 @@
 // claude.jsx — Browser fallback for window.claude.complete.
 // On claude.ai/design the sandbox injects window.claude.complete for us.
-// On a public deploy we route to whichever provider the user picked in
-// Tweaks: Anthropic, OpenAI, or Google Gemini. Keys + model choices are
-// stored in localStorage, per provider.
+// On Vercel we prefer the /api proxy so provider keys stay server-side.
+// GitHub Pages / local static use can still fall back to browser-stored keys.
 
 (function () {
   if (window.claude && typeof window.claude.complete === 'function') return;
 
   const KEY_PROVIDER = 'vp_provider';
+  const KEY_API_MODE = 'vp_api_mode'; // proxy | browser | auto
+  const KEY_ACCESS_TOKEN = 'vp_access_token';
 
   // One-shot migration: strip a known-bad saved Gemini model so users who
   // picked it before we could verify it don't get stuck on a 404.
@@ -87,7 +88,7 @@
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify({ model, max_tokens: 700, system, messages: anthMsgs }),
+      body: JSON.stringify({ model, max_tokens: 8192, system, messages: anthMsgs }),
     });
     if (!resp.ok) throw await apiError(resp, 'Anthropic');
     const data = await resp.json();
@@ -105,7 +106,7 @@
         'content-type': 'application/json',
         'authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ model, messages: openaiMessages, max_tokens: 700 }),
+      body: JSON.stringify({ model, messages: openaiMessages }),
     });
     if (!resp.ok) throw await apiError(resp, 'OpenAI');
     const data = await resp.json();
@@ -126,7 +127,7 @@
         'http-referer': window.location.origin || 'https://vibeprompt.app',
         'x-title': 'VibePrompt',
       },
-      body: JSON.stringify({ model, messages: openaiMessages, max_tokens: 700 }),
+      body: JSON.stringify({ model, messages: openaiMessages }),
     });
     if (!resp.ok) throw await apiError(resp, 'OpenRouter');
     const data = await resp.json();
@@ -141,7 +142,6 @@
     const body = {
       contents,
       systemInstruction: { parts: [{ text: system }] },
-      generationConfig: { maxOutputTokens: 700 },
     };
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const resp = await fetch(url, {
@@ -179,6 +179,54 @@
     return new Error(`${provider} API ${resp.status}: ${detail}`);
   }
 
+  async function proxyError(resp) {
+    let detail = '';
+    try {
+      const json = await resp.json();
+      detail = json.error || JSON.stringify(json).slice(0, 240);
+    } catch {
+      detail = (await resp.text().catch(() => '')).slice(0, 240);
+    }
+    const msg = resp.status === 401
+      ? 'Invalid VibePrompt access token. Check Tweaks.'
+      : detail || `Hosted API returned ${resp.status}.`;
+    const err = new Error(msg);
+    err.status = resp.status;
+    throw err;
+  }
+
+  function apiMode() {
+    return (localStorage.getItem(KEY_API_MODE) || 'auto').toLowerCase();
+  }
+
+  function accessHeaders() {
+    const token = (localStorage.getItem(KEY_ACCESS_TOKEN) || '').trim();
+    return token ? { 'x-vibeprompt-token': token } : {};
+  }
+
+  async function callProxy({ provider, system, messages, model }) {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...accessHeaders(),
+      },
+      body: JSON.stringify({ provider, model, system, messages }),
+    });
+    if (!resp.ok) await proxyError(resp);
+    const data = await resp.json();
+    return data.text || '';
+  }
+
+  async function listProxyModels(provider) {
+    const resp = await fetch(`/api/models?provider=${encodeURIComponent(provider)}`, {
+      headers: accessHeaders(),
+    });
+    if (!resp.ok) await proxyError(resp);
+    const data = await resp.json();
+    return data.models || [];
+  }
+
   // Pick a sensible default from a fetched list — prefer fast, widely-available models.
   function pickDefaultFromList(providerId, list) {
     if (!list || !list.length) return null;
@@ -201,10 +249,24 @@
     const provider = (localStorage.getItem(KEY_PROVIDER) || 'anthropic').toLowerCase();
     const cfg = CFG[provider] || CFG.anthropic;
     const apiKey = (localStorage.getItem(cfg.storageKey) || '').trim();
-    if (!apiKey) {
-      throw new Error(`Add your ${cfg.label} API key in Tweaks (top-right) to enable chat.`);
-    }
     const model = (localStorage.getItem(cfg.storageModel) || '').trim() || cfg.defaultModel;
+    const mode = apiMode();
+
+    if (mode !== 'browser') {
+      try {
+        return await callProxy({ provider, system, messages, model });
+      } catch (e) {
+        if (mode === 'proxy') throw e;
+        if (!apiKey) {
+          throw new Error('Hosted API unavailable. Add a browser fallback key in Tweaks, or deploy the Vercel API.');
+        }
+      }
+    }
+
+    if (!apiKey) {
+      throw new Error(`Add your ${cfg.label} API key in Tweaks, or use a Vercel hosted API with an access token.`);
+    }
+
     try {
       return await cfg.call({ system, messages, model, apiKey });
     } catch (e) {
@@ -232,7 +294,19 @@
   window.claude.listModels = async function (providerId, apiKey) {
     providerId = (providerId || '').toLowerCase();
     apiKey = (apiKey || '').trim();
-    if (!apiKey) throw new Error('Save an API key first.');
+    const mode = apiMode();
+    if (mode !== 'browser') {
+      try {
+        return await listProxyModels(providerId);
+      } catch (e) {
+        if (mode === 'proxy') throw e;
+        if (!apiKey) {
+          throw new Error('Hosted API unavailable. Add a browser fallback key in Tweaks, or deploy the Vercel API.');
+        }
+      }
+    }
+
+    if (!apiKey) throw new Error('Save an API key first, or use the hosted API proxy.');
 
     if (providerId === 'anthropic') {
       const resp = await fetch('https://api.anthropic.com/v1/models', {
